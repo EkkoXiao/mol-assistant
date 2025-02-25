@@ -9,8 +9,8 @@ def load_html(file_path):
     with open(file_path, "r", encoding="utf-8") as file:
         return file.read()
 
-# 调用缓存函数
-html_content = load_html("style.html")
+# # 调用缓存函数
+# html_content = load_html("style.html")
 # 使用CSS来定制样式
 # st.markdown(html_content, unsafe_allow_html=True)
 
