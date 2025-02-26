@@ -76,7 +76,7 @@ tab = st.radio(label="选择功能", options=[
     "🔬 **药物反应预测**",
     "🗣️ **对话系统**"],
     captions=[
-    "药物详细信息展示"
+    "药物详细信息展示",
     "进行药物对之间反应预测",
     "与生物医药大模型对话"],
     horizontal=True, label_visibility="collapsed")
