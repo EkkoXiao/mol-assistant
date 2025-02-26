@@ -1,6 +1,6 @@
 import requests
 import streamlit as st
-import pandas as pd
+
 # 设置页面标题和样式
 st.set_page_config(page_title="药物反应助手", page_icon="💊", layout="wide")
 
@@ -16,7 +16,7 @@ def load_html(file_path):
 
 # 初始化聊天记录
 if "messages" not in st.session_state:
-    st.session_state.messages = []
+    st.session_state.messages = [{"role": "system", "content": "你是一名医药反应交互的大语言模型助手，请详细准确地回答用户提出的问题。"}]
 
 # 创建左侧sidebar
 with st.sidebar:
@@ -121,8 +121,9 @@ API_URL = "https://f895-43-247-185-76.ngrok-free.app/generate"
 if tab == "对话系统":
     # Display chat messages from history on app rerun
     for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+        if message["role"] != "system":
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
 
     # React to user input
     if prompt := st.chat_input("What is up?"):
@@ -134,19 +135,20 @@ if tab == "对话系统":
         try:
             response = requests.post(
                 API_URL,
-                json={"input_text": prompt}
+                json={"messages": st.session_state.messages}
             )
             if response.status_code == 200:
                 generated_text = response.json()["generated_text"]
             else:
                 st.error(f"请求失败，状态码：{response.status_code}")
+                st.error(f"错误详情：{response.text}")
+
         except Exception as e:
             st.error(f"请求出错：{e}")
 
-        response = generated_text
         # Display assistant response in chat message container
         with st.chat_message("assistant"):
-            st.markdown(response)
+            st.markdown(generated_text)
         # Add assistant response to chat history
-        st.session_state.messages.append({"role": "assistant", "content": response})
+        st.session_state.messages.append({"role": "assistant", "content": generated_text})
             
