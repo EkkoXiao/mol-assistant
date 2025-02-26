@@ -71,7 +71,15 @@ with st.sidebar:
 # 主页面内容
 st.title("药物反应助手")
 
-tab = st.radio(label="选择功能", options=["药物信息", "药物反应预测", "对话系统"], horizontal=True)
+tab = st.radio(label="选择功能", options=[
+    "💊 **药物信息**",
+    "🔬 **药物反应预测**",
+    "🗣️ **对话系统**"],
+    captions=[
+    "药物详细信息展示"
+    "进行药物对之间反应预测",
+    "与生物医药大模型对话"],
+    horizontal=True, label_visibility="collapsed")
 if tab == "药物信息":
     st.subheader("已提交的药物卡片")
     # 显示所有药物卡片
@@ -186,4 +194,3 @@ if tab == "对话系统":
             st.markdown(generated_text)
         # Add assistant response to chat history
         st.session_state.messages.append({"role": "assistant", "content": generated_text})
-            
