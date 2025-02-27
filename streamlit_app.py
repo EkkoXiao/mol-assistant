@@ -80,7 +80,7 @@ tab = st.radio(label="选择功能", options=[
     "进行药物对之间反应预测",
     "与生物医药大模型对话"],
     horizontal=True, label_visibility="collapsed")
-if tab == "药物信息":
+if tab == "💊 **药物信息**":
     st.subheader("已提交的药物卡片")
     # 显示所有药物卡片
     if "drugs" in st.session_state and len(st.session_state.drugs) > 0:
@@ -105,7 +105,7 @@ if tab == "药物信息":
         st.write("没有任何药物记录！")
 
 
-if tab == "药物反应预测":
+if tab == "🔬 **药物反应预测**":
     st.subheader("药物选择按钮")
 
     if "drugs" in st.session_state and len(st.session_state.drugs) > 0:
@@ -161,7 +161,7 @@ def toggle_drug_selection(drug_name, selected_drugs):
         selected_drugs.append(drug_name)
     st.session_state.selected_drugs = selected_drugs
 
-if tab == "对话系统":
+if tab == "🗣️ **对话系统**":
     # Display chat messages from history on app rerun
     for message in st.session_state.messages:
         if message["role"] != "system":
