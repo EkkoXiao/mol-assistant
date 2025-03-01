@@ -1,3 +1,4 @@
+import re
 import time
 import requests
 import streamlit as st
@@ -20,6 +21,7 @@ API_URL = "https://f895-43-247-185-76.ngrok-free.app/"
 # 初始化聊天记录
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "system", "content": "你是一名医药反应交互的大语言模型助手，请详细准确地回答用户提出的问题。"}]
+    st.session_state.messages.append({"role": "assistant", "content": "你好！我是用于医药反应交互的大语言模型助手。请问您有什么问题？我将根据提供的药物数据及相互作用预测结果，并结合现有医学权威数据进行解答。"})
 if "drugs" not in st.session_state:
     st.session_state.drugs = []
 if "interactions" not in st.session_state:
@@ -213,20 +215,25 @@ if tab == "🗣️ **对话系统**":
         st.session_state.messages.append({"role": "user", "content": prompt})
 
         try:
+            messages = st.session_state.messages
+            for item in messages:
+                if item["role"] == "user":
+                    item["content"] += "请基于全球权威指南（如NCCN、ESMO）、高循证等级的临床试验数据（如III期随机对照试验，RCT）以及相关研究数据库，提供详细分析和量化评估。"
             response = requests.post(
                 f"{API_URL}generate",
                 json={"messages": st.session_state.messages}
             )
             if response.status_code == 200:
                 generated_text = response.json()["generated_text"]
+                answer = re.sub(r'<think>.*?</think>', '', generated_text, flags=re.DOTALL)
+
+                with st.chat_message("assistant"):
+                    st.markdown(answer)
+
+                st.session_state.messages.append({"role": "assistant", "content": answer})
             else:
                 st.error(f"请求失败，状态码：{response.status_code}")
                 st.error(f"错误详情：{response.text}")
 
         except Exception as e:
             st.error(f"请求出错：{e}")
-
-        with st.chat_message("assistant"):
-            st.markdown(generated_text)
-
-        st.session_state.messages.append({"role": "assistant", "content": generated_text})
