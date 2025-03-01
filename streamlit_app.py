@@ -1,3 +1,4 @@
+import time
 import requests
 import streamlit as st
 
@@ -19,7 +20,10 @@ API_URL = "https://f895-43-247-185-76.ngrok-free.app/"
 # 初始化聊天记录
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "system", "content": "你是一名医药反应交互的大语言模型助手，请详细准确地回答用户提出的问题。"}]
-
+if "drugs" not in st.session_state:
+    st.session_state.drugs = []
+if "intearctions" not in st.session_state:
+    st.session_state.interactions = {}
 # 创建左侧sidebar
 with st.sidebar:
     st.header("药物信息输入")
@@ -52,10 +56,27 @@ with st.sidebar:
                     )
                     if response.status_code == 200:
                         drug_data = response.json()
-                        if "drugs" not in st.session_state:
-                            st.session_state.drugs = []
-                        st.session_state.drugs.append(drug_data)
-                        st.success(f"药物 {drug_name} 信息已成功输入！")
+                        new_idx = len(st.session_state.drugs)
+                        success = True
+                        for idx, drug in enumerate(st.session_state.drugs):
+                            time.sleep(5)
+                            response = requests.get(
+                                f"{API_URL}/interaction",
+                                json={
+                                    "drug1": drug_data,
+                                    "drug2": drug
+                                }
+                            )
+                            if response.status_code == 200:
+                                interactions = response.json()["interactions"]
+                                st.session_state.interactions[(idx, new_idx)] = interactions
+                            else:
+                                success = False
+                                st.error(f"请求失败，状态码：{response.status_code}")
+                                st.error(f"错误详情：{response.text}")
+                        if success:
+                            st.session_state.drugs.append(drug_data)
+                            st.success(f"药物 {drug_name} 信息已成功输入！")
                     else:
                         st.error(f"请求失败，状态码：{response.status_code}")
                         st.error(f"错误详情：{response.text}")
@@ -63,7 +84,7 @@ with st.sidebar:
                     st.error(f"请求出错：{str(e)}")
 
     delete_all_button = st.button("删除所有药物", key="delete_all", help="删除所有已保存的药物", use_container_width=True, 
-                                  on_click=lambda: st.session_state.pop('drugs', None))
+                                  on_click=lambda: (st.session_state.pop('drugs', None), st.session_state.pop('interactions', None)))
 
     if delete_all_button:
         st.success("所有药物已删除！")
@@ -106,13 +127,13 @@ if tab == "💊 **药物信息**":
 
 
 if tab == "🔬 **药物反应预测**":
-    st.subheader("药物选择按钮")
+    st.subheader("选择需要查看反应的药物")
 
     if "drugs" in st.session_state and len(st.session_state.drugs) > 0:
         drug_names = [drug["name"] for drug in st.session_state.drugs]
 
-        drug1 = st.selectbox("选择第一个药物", options=drug_names, key="drug1")
-        drug2 = st.selectbox("选择第二个药物", options=drug_names, key="drug2")
+        drug1 = st.selectbox("选择药物 1", options=drug_names, key="drug1")
+        drug2 = st.selectbox("选择药物 2", options=drug_names, key="drug2")
  
         st.write(f"你选择的药物是: {drug1} 和 {drug2}")
 
@@ -121,34 +142,38 @@ if tab == "🔬 **药物反应预测**":
                 st.write(f"不能选择相同药物！")
             # 在此处编写药物反应逻辑
             else:
-                drug1_info = [drug for drug in st.session_state.drugs if drug["name"] == drug1][0]
-                drug2_info = [drug for drug in st.session_state.drugs if drug["name"] == drug2][0]
-                try: 
-                    response = requests.get(
-                        f"{API_URL}/interaction",
-                        json={
-                            "drug1": drug1_info,
-                            "drug2": drug2_info
-                        }
-                    )
-                    if response.status_code == 200:
-                        interactions = response.json()["interactions"]
-                        severity = response.json()["severity"]
-                        st.subheader("反应类型及可能性")
-                        interaction_text = ""
-                        for reaction_type, probability in response.json()["interactions"].items():
-                            interaction_text += f"**{reaction_type}:** {probability * 100}%  "
+                drug1_idx = [idx for idx, drug in enumerate(st.session_state.drugs) if drug["name"] == drug1][0]
+                drug2_idx = [idx for idx, drug in enumerate(st.session_state.drugs) if drug["name"] == drug2][0]
+                interactions = st.session_state.interactions.get(tuple(sorted((drug1_idx, drug2_idx))))
+                st.subheader("反应类型及可能性")
+                html_code = """
+                <style>
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-top: 20px;
+                }
+                th, td {
+                    text-align: left;
+                    padding: 8px;
+                    border: 1px solid #ddd;
+                }
+                th {
+                    background-color: #f2f2f2;
+                    font-weight: bold;
+                }
+                </style>
+                <table>
+                <tr>
+                    <th>反应类型</th>
+                    <th>可能性 (%)</th>
+                </tr>
+                """
 
-                        st.markdown(interaction_text)
+                for reaction_type, (probability, idx) in interactions.items():
+                    html_code += f"<tr><td>{reaction_type}</td><td>{probability * 100:.2f}</td></tr>"
 
-                        st.subheader("严重程度")
-                        st.markdown(f"{response.json()['severity']}")
-                    else:
-                        st.error(f"请求失败，状态码：{response.status_code}")
-                        st.error(f"错误详情：{response.text}")
-                except Exception as e:
-                    st.error(f"请求出错：{str(e)}")
-
+                html_code += "</table>"
     else:
         st.write("没有任何药物记录！")
 
@@ -167,12 +192,10 @@ if tab == "🗣️ **对话系统**":
         if message["role"] != "system":
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
-
+    
     # React to user input
     if prompt := st.chat_input("What is up?"):
-        # Display user message in chat message container
         st.chat_message("user").markdown(prompt)
-        # Add user message to chat history
         st.session_state.messages.append({"role": "user", "content": prompt})
 
         try:
@@ -189,8 +212,7 @@ if tab == "🗣️ **对话系统**":
         except Exception as e:
             st.error(f"请求出错：{e}")
 
-        # Display assistant response in chat message container
         with st.chat_message("assistant"):
             st.markdown(generated_text)
-        # Add assistant response to chat history
+
         st.session_state.messages.append({"role": "assistant", "content": generated_text})
