@@ -75,11 +75,11 @@ with st.sidebar:
                                 interactions = response.json()["interactions"]
                                 st.session_state.interactions.append({idx * 10 + new_idx: interactions})
                                 interaction_text = "\n".join(
-                                    [f"- \"{desc}\"  ({prob * 100:.2f}%)" for desc, (prob, _) in interactions]
+                                    [f"- \"{desc}\"  ({prob * 100:.2f}%)" for desc, (prob, _) in interactions.items()]
                                 )
                                 drug1_name = drug_data["name"]
                                 drug2_name = drug["name"]
-                                st.session_state.messages.append({"role": "system", "content": f"新增药物反应信息：药物{drug1_name}与药物{drug2_name}联合使用可能发生相互作用，以下是可能的反应类型及其概率：{interaction_text.items()}"})
+                                st.session_state.messages.append({"role": "system", "content": f"新增药物反应信息：药物{drug1_name}与药物{drug2_name}联合使用可能发生相互作用，以下是可能的反应类型及其概率：{interaction_text}"})
                             else:
                                 success = False
                                 st.error(f"请求失败，状态码：{response.status_code}")
