@@ -210,18 +210,15 @@ if tab == "🗣️ **对话系统**":
                 st.markdown(message["content"])
 
     # React to user input
-    if prompt := st.chat_input("What is up?"):
+    if prompt := st.chat_input("请输入您的问题"):
         st.chat_message("user").markdown(prompt)
         st.session_state.messages.append({"role": "user", "content": prompt})
-
         try:
-            messages = st.session_state.messages
-            for item in messages:
-                if item["role"] == "user":
-                    item["content"] += "请基于全球权威指南（如NCCN、ESMO）、高循证等级的临床试验数据（如III期随机对照试验，RCT）以及相关研究数据库，提供详细分析和量化评估。"
+            messages = st.session_state.messages.copy()
+            messages.append({"role": "system", "content": "如果上述问题涉及生物医药，请基于全球权威指南（如NCCN、ESMO）、高循证等级的临床试验数据（如III期随机对照试验，RCT）以及相关研究数据库，提供详细分析和量化评估。"})
             response = requests.post(
                 f"{API_URL}generate",
-                json={"messages": st.session_state.messages}
+                json={"messages": messages}
             )
             if response.status_code == 200:
                 generated_text = response.json()["generated_text"]
