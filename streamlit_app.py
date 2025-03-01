@@ -22,8 +22,8 @@ if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "system", "content": "你是一名医药反应交互的大语言模型助手，请详细准确地回答用户提出的问题。"}]
 if "drugs" not in st.session_state:
     st.session_state.drugs = []
-if "intearctions" not in st.session_state:
-    st.session_state.interactions = {}
+if "interactions" not in st.session_state:
+    st.session_state.interactions = []
 # 创建左侧sidebar
 with st.sidebar:
     st.header("药物信息输入")
@@ -41,6 +41,9 @@ with st.sidebar:
         # 提交后处理数据
         if submit_button:
             if drug_name:
+                drug_idx = [idx for idx, drug in enumerate(st.session_state.drugs) if drug["name"] == drug_name]
+                if drug_idx != []:
+                    st.error("药物已输入！")
                 try: 
                     response = requests.get(
                         f"{API_URL}/info",
@@ -58,6 +61,7 @@ with st.sidebar:
                         drug_data = response.json()
                         new_idx = len(st.session_state.drugs)
                         success = True
+                        st.session_state.messages.append({"role": "system", "content": f"新增药物信息：药物名{drug_name}，药物性质信息{drug_property}，药物靶点信息{drug_target}"})
                         for idx, drug in enumerate(st.session_state.drugs):
                             time.sleep(5)
                             response = requests.get(
@@ -69,7 +73,13 @@ with st.sidebar:
                             )
                             if response.status_code == 200:
                                 interactions = response.json()["interactions"]
-                                st.session_state.interactions[(idx, new_idx)] = interactions
+                                st.session_state.interactions.append({idx * 10 + new_idx: interactions})
+                                interaction_text = "\n".join(
+                                    [f"- \"{desc}\"  ({prob * 100:.2f}%)" for desc, (prob, _) in interactions]
+                                )
+                                drug1_name = drug_data["name"]
+                                drug2_name = drug["name"]
+                                st.session_state.messages.append({"role": "system", "content": f"新增药物反应信息：药物{drug1_name}与药物{drug2_name}联合使用可能发生相互作用，以下是可能的反应类型及其概率：{interaction_text.items()}"})
                             else:
                                 success = False
                                 st.error(f"请求失败，状态码：{response.status_code}")
@@ -142,9 +152,12 @@ if tab == "🔬 **药物反应预测**":
                 st.write(f"不能选择相同药物！")
             # 在此处编写药物反应逻辑
             else:
-                drug1_idx = [idx for idx, drug in enumerate(st.session_state.drugs) if drug["name"] == drug1][0]
-                drug2_idx = [idx for idx, drug in enumerate(st.session_state.drugs) if drug["name"] == drug2][0]
-                interactions = st.session_state.interactions.get(tuple(sorted((drug1_idx, drug2_idx))))
+                drug1_idx = next((idx for idx, drug in enumerate(st.session_state.drugs) if drug["name"] == drug1), None)
+                drug2_idx = next((idx for idx, drug in enumerate(st.session_state.drugs) if drug["name"] == drug2), None)
+                idx_key = min(drug1_idx, drug2_idx) * 10 + max(drug1_idx, drug2_idx)
+
+                interactions = next((pair[idx_key] for pair in st.session_state.interactions if idx_key in pair), None)
+            
                 st.subheader("反应类型及可能性")
                 html_code = """
                 <style>
@@ -174,6 +187,7 @@ if tab == "🔬 **药物反应预测**":
                     html_code += f"<tr><td>{reaction_type}</td><td>{probability * 100:.2f}</td></tr>"
 
                 html_code += "</table>"
+                st.markdown(html_code, unsafe_allow_html=True)
     else:
         st.write("没有任何药物记录！")
 
@@ -192,7 +206,7 @@ if tab == "🗣️ **对话系统**":
         if message["role"] != "system":
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
-    
+
     # React to user input
     if prompt := st.chat_input("What is up?"):
         st.chat_message("user").markdown(prompt)
