@@ -217,34 +217,35 @@ if tab == "🗣️ **对话系统**":
         try:
             messages = st.session_state.messages.copy()
             messages.append({"role": "system", "content": "如果上述问题涉及生物医药，请基于全球权威指南（如NCCN、ESMO）、高循证等级的临床试验数据（如III期随机对照试验，RCT）以及相关研究数据库，提供详细的原因分析和量化评估，提供的药物反应预测概率数据可能有误，请仔细辨别。"})
-            response = requests.post(
-                f"{API_URL}stream",
-                json={"messages": messages}
-            )
-            answer = "结果生成中，请稍加等待..."
-            response_placeholder = st.empty()
-            decoder = json.JSONDecoder()
-            think = True
-
-            for chunk in response.iter_lines():
-                chunk = chunk.decode("utf-8")
-                try:
-                    obj, end = decoder.raw_decode(chunk)
-                    word = obj['message']['content']
-                    if not think:
-                        answer += word
-                    if word == "</think>":
-                        think = False
-                        answer = ""
-                    with response_placeholder.container():
-                        st.chat_message("assistant").markdown(answer)
-                except json.JSONDecodeError:
-                    st.error("解析中途出错！")
+            with st.chat_message("assistant"):
+                response_placeholder = st.empty()
+                response = requests.post(
+                    f"{API_URL}stream",
+                    json={"messages": messages}
+                )
+                answer = "结果生成中，请稍加等待..."
                 
+                decoder = json.JSONDecoder()
+                think = True
+
+                for chunk in response.iter_lines():
+                    chunk = chunk.decode("utf-8")
+                    try:
+                        obj, end = decoder.raw_decode(chunk)
+                        word = obj['message']['content']
+                        if not think:
+                            answer += word
+                            response_placeholder.markdown(answer + "▌")
+                        else:
+                            response_placeholder.markdown(answer)
+                        if word == "</think>":
+                            think = False
+                            answer = ""
+                    except json.JSONDecodeError:
+                        st.error("解析中途出错！")
+                
+                response_placeholder.markdown(answer)
                 st.session_state.messages.append({"role": "assistant", "content": answer})
-            else:
-                st.error(f"请求失败，状态码：{response.status_code}")
-                st.error(f"错误详情：{response.text}")
 
         except Exception as e:
             st.error(f"请求出错：{e}")
