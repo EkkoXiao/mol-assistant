@@ -21,12 +21,18 @@ API_URL = "https://f895-43-247-185-76.ngrok-free.app/"
 
 # 初始化聊天记录
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "system", "content": "你是一名医药反应交互的大语言模型助手，请详细准确地回答用户提出的问题。"}]
-    st.session_state.messages.append({"role": "assistant", "content": "你好！我是用于医药反应交互的大语言模型助手。请问您有什么问题？我将根据提供的药物数据及相互作用预测结果，并结合现有医学权威数据进行解答。"})
+    st.session_state.messages = []
 if "drugs" not in st.session_state:
     st.session_state.drugs = []
 if "interactions" not in st.session_state:
     st.session_state.interactions = []
+if "greetings" not in st.session_state:
+    st.session_state.greetings = False
+if "buttons" not in st.session_state:
+    st.session_state.buttons = False
+if "button_pressed" not in st.session_state:
+    st.session_state.button_pressed = ""
+
 # 创建左侧sidebar
 with st.sidebar:
     st.header("药物信息输入")
@@ -64,7 +70,7 @@ with st.sidebar:
                         drug_data = response.json()
                         new_idx = len(st.session_state.drugs)
                         success = True
-                        st.session_state.messages.append({"role": "system", "content": f"新增药物信息：药物名{drug_name}，药物性质信息{drug_property}，药物靶点信息{drug_target}"})
+                        st.session_state.messages.append({"role": "system", "content": f"新增药物信息：药物名{drug_data['name']}，药物性质信息{drug_data['property']}，药物靶点信息{drug_data['target']}"})
                         for idx, drug in enumerate(st.session_state.drugs):
                             time.sleep(5)
                             response = requests.get(
@@ -203,15 +209,39 @@ def toggle_drug_selection(drug_name, selected_drugs):
         selected_drugs.append(drug_name)
     st.session_state.selected_drugs = selected_drugs
 
+example_prompts = [
+    "请列出当前系统已收录的药物信息，包括药物名称、简介以及靶点信息",
+    "请分析当前收录的药物在联合使用时可能产生的协同作用和拮抗作用",
+    "当前收录的药物在治疗癌症上是否具有临床意义，请进行疗效与风险评估"
+]
+
 if tab == "🗣️ **对话系统**":
     # Display chat messages from history on app rerun
+    if not st.session_state.greetings:
+        st.session_state.messages.append({"role": "system", "content": "你是一名医药反应交互的大语言模型助手，请详细准确地回答用户提出的问题。"})
+        st.session_state.messages.append({"role": "assistant", "content": "你好！我是用于医药反应交互的大语言模型助手。请问您有什么问题？我将根据提供的药物数据及相互作用预测结果，并结合现有医学权威数据进行解答。"})
+        st.session_state.greetings = True
+    
     for message in st.session_state.messages:
         if message["role"] != "system":
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
 
+    def set_example(prompt):
+        st.session_state.button_pressed = prompt
+
+    if not st.session_state.buttons:
+        button_cols = st.columns(3)
+
+        button_cols[0].button(example_prompts[0], on_click=set_example, args=(example_prompts[0],))
+        button_cols[1].button(example_prompts[1], on_click=set_example, args=(example_prompts[1],))
+        button_cols[2].button(example_prompts[2], on_click=set_example, args=(example_prompts[2],))
+
+        st.session_state.buttons = True
+
     # React to user input
-    if prompt := st.chat_input("请输入您的问题"):
+    if prompt := (st.chat_input("请输入您的问题") or st.session_state.button_pressed):
+        st.session_state.button_pressed = ""
         st.chat_message("user").markdown(prompt)
         st.session_state.messages.append({"role": "user", "content": prompt})
         try:
@@ -247,6 +277,7 @@ if tab == "🗣️ **对话系统**":
                 
                 response_placeholder.markdown(answer)
                 st.session_state.messages.append({"role": "assistant", "content": answer})
+
 
         except Exception as e:
             st.error(f"请求出错：{e}")
