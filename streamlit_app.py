@@ -221,7 +221,8 @@ if tab == "🗣️ **对话系统**":
                 response_placeholder = st.empty()
                 response = requests.post(
                     f"{API_URL}stream",
-                    json={"messages": messages}
+                    json={"messages": messages},
+                    stream=True
                 )
                 answer = "结果生成中，请稍加等待..."
                 
