@@ -237,11 +237,11 @@ if tab == "🗣️ **对话系统**":
                         if word == "</think>":
                             think = False
                             answer = ""
+                        with response_placeholder.container():
+                            st.chat_message("assistant").markdown(answer)
                     except json.JSONDecodeError:
-                        st.error("解析失败")
-                with response_placeholder.container():
-                    st.chat_message("assistant").markdown(answer)
-
+                        st.error("解析中途出错！")
+                
                 st.session_state.messages.append({"role": "assistant", "content": answer})
             else:
                 st.error(f"请求失败，状态码：{response.status_code}")
