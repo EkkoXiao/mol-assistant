@@ -221,26 +221,25 @@ if tab == "🗣️ **对话系统**":
                 f"{API_URL}stream",
                 json={"messages": messages}
             )
-            if response.status_code == 200:
-                answer = "结果生成中，请稍加等待..."
-                response_placeholder = st.empty()
-                decoder = json.JSONDecoder()
-                think = True
+            answer = "结果生成中，请稍加等待..."
+            response_placeholder = st.empty()
+            decoder = json.JSONDecoder()
+            think = True
 
-                for chunk in response.iter_lines():
-                    chunk = chunk.decode("utf-8")
-                    try:
-                        obj, end = decoder.raw_decode(chunk)
-                        word = obj['message']['content']
-                        if not think:
-                            answer += word
-                        if word == "</think>":
-                            think = False
-                            answer = ""
-                        with response_placeholder.container():
-                            st.chat_message("assistant").markdown(answer)
-                    except json.JSONDecodeError:
-                        st.error("解析中途出错！")
+            for chunk in response.iter_lines():
+                chunk = chunk.decode("utf-8")
+                try:
+                    obj, end = decoder.raw_decode(chunk)
+                    word = obj['message']['content']
+                    if not think:
+                        answer += word
+                    if word == "</think>":
+                        think = False
+                        answer = ""
+                    with response_placeholder.container():
+                        st.chat_message("assistant").markdown(answer)
+                except json.JSONDecodeError:
+                    st.error("解析中途出错！")
                 
                 st.session_state.messages.append({"role": "assistant", "content": answer})
             else:
