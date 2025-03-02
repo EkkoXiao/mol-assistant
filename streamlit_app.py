@@ -1,3 +1,4 @@
+import json
 import re
 import time
 import requests
@@ -217,15 +218,29 @@ if tab == "🗣️ **对话系统**":
             messages = st.session_state.messages.copy()
             messages.append({"role": "user", "content": "如果上述问题涉及生物医药，请基于全球权威指南（如NCCN、ESMO）、高循证等级的临床试验数据（如III期随机对照试验，RCT）以及相关研究数据库，提供详细分析和量化评估，不要局限于提供的可能错误的药物反应预测概率数据。"})
             response = requests.post(
-                f"{API_URL}generate",
+                f"{API_URL}stream",
                 json={"messages": messages}
             )
             if response.status_code == 200:
-                generated_text = response.json()["generated_text"]
-                answer = re.sub(r'<think>.*?</think>', '', generated_text, flags=re.DOTALL)
+                answer = "结果生成中，请稍加等待..."
+                response_placeholder = st.empty()
+                decoder = json.JSONDecoder()
+                think = True
 
-                with st.chat_message("assistant"):
-                    st.markdown(answer)
+                for chunk in response.iter_lines():
+                    chunk = chunk.decode("utf-8")
+                    try:
+                        obj, end = decoder.raw_decode(chunk)
+                        word = obj['message']['content']
+                        if not think:
+                            answer += word
+                        if word == "</think>":
+                            think = False
+                            answer = ""
+                    except json.JSONDecodeError:
+                        st.error("解析失败")
+                with response_placeholder.container():
+                    st.chat_message("assistant").markdown(answer)
 
                 st.session_state.messages.append({"role": "assistant", "content": answer})
             else:
