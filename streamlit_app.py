@@ -14,9 +14,9 @@ def load_html(file_path):
 
 API_URL = "https://f895-43-247-185-76.ngrok-free.app/"
 
-# # 调用缓存函数
-# html_content = load_html("style.html")
-# 使用CSS来定制样式
+# 调用缓存函数
+# html_content = load_html("page.html")
+
 # st.markdown(html_content, unsafe_allow_html=True)
 
 # 初始化聊天记录
@@ -28,10 +28,10 @@ if "interactions" not in st.session_state:
     st.session_state.interactions = []
 if "greetings" not in st.session_state:
     st.session_state.greetings = False
-if "buttons" not in st.session_state:
-    st.session_state.buttons = False
 if "button_pressed" not in st.session_state:
     st.session_state.button_pressed = ""
+if "disabled" not in st.session_state:
+    st.session_state.disabled = False
 
 # 创建左侧sidebar
 with st.sidebar:
@@ -229,18 +229,17 @@ if tab == "🗣️ **对话系统**":
 
     def set_example(prompt):
         st.session_state.button_pressed = prompt
+        st.session_state.disabled = True
 
-    if not st.session_state.buttons:
-        button_cols = st.columns(3)
+    button_cols = st.columns(3)
 
-        button_cols[0].button(example_prompts[0], on_click=set_example, args=(example_prompts[0],))
-        button_cols[1].button(example_prompts[1], on_click=set_example, args=(example_prompts[1],))
-        button_cols[2].button(example_prompts[2], on_click=set_example, args=(example_prompts[2],))
-
-        st.session_state.buttons = True
+    button_cols[0].button(example_prompts[0], on_click=set_example, args=(example_prompts[0],), disabled=st.session_state.disabled)
+    button_cols[1].button(example_prompts[1], on_click=set_example, args=(example_prompts[1],), disabled=st.session_state.disabled)
+    button_cols[2].button(example_prompts[2], on_click=set_example, args=(example_prompts[2],), disabled=st.session_state.disabled)
 
     # React to user input
     if prompt := (st.chat_input("请输入您的问题") or st.session_state.button_pressed):
+        st.session_state.disabled = False
         st.session_state.button_pressed = ""
         st.chat_message("user").markdown(prompt)
         st.session_state.messages.append({"role": "user", "content": prompt})
@@ -248,7 +247,10 @@ if tab == "🗣️ **对话系统**":
             messages = st.session_state.messages.copy()
             messages.append({"role": "system", "content": "如果上述问题涉及生物医药，请基于全球权威指南（如NCCN、ESMO）、高循证等级的临床试验数据（如III期随机对照试验，RCT）以及相关研究数据库，提供详细的原因分析和量化评估，提供的药物反应预测概率数据可能有误，请仔细辨别。"})
             with st.chat_message("assistant"):
+                answer = "模型连接中..."
                 response_placeholder = st.empty()
+                response_placeholder.markdown(answer)
+
                 response = requests.post(
                     f"{API_URL}stream",
                     json={"messages": messages},
@@ -259,6 +261,8 @@ if tab == "🗣️ **对话系统**":
                 decoder = json.JSONDecoder()
                 think = True
 
+                st.session_state.messages.append({"role": "assistant", "content": ""})
+
                 for chunk in response.iter_lines():
                     chunk = chunk.decode("utf-8")
                     try:
@@ -267,6 +271,7 @@ if tab == "🗣️ **对话系统**":
                         if not think:
                             answer += word
                             response_placeholder.markdown(answer + "▌")
+                            st.session_state.messages[-1]['content'] = answer
                         else:
                             response_placeholder.markdown(answer)
                         if word == "</think>":
@@ -276,8 +281,9 @@ if tab == "🗣️ **对话系统**":
                         st.error("解析中途出错！")
                 
                 response_placeholder.markdown(answer)
-                st.session_state.messages.append({"role": "assistant", "content": answer})
+                st.session_state.messages[-1]['content'] = answer
 
+                st.rerun()
 
         except Exception as e:
             st.error(f"请求出错：{e}")
