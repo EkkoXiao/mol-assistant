@@ -1,3 +1,4 @@
+import itertools
 import json
 import re
 import time
@@ -36,7 +37,7 @@ if "disabled" not in st.session_state:
 
 # 创建左侧sidebar
 with st.sidebar:
-    st.header("药物信息输入")
+    st.header("📝 药物信息输入")
     
     # 使用form包裹输入内容
     with st.form(key="drug_form", clear_on_submit=True):
@@ -130,7 +131,7 @@ with st.sidebar:
                                     )
                                     drug1_name = drug_data["name"]
                                     drug2_name = drug["name"]
-                                    st.session_state.messages.append({"role": "system", "content": f"<DRUG>新增药物反应信息：药物{drug1_name}与药物{drug2_name}联合使用可能发生相互作用，以下是可能的反应类型及其概率：{interaction_text}"})
+                                    st.session_state.messages.append({"role": "system", "content": f"<DRUG>新增药物反应信息：药物{drug1_name}与药物{drug2_name}联合使用可能发生相互作用，以下是可能的反应类型及其概率值：{interaction_text}"})
                                 else:
                                     success = False
                                     st.error(f"查询药物相互作用出错！请检查药物信息")
@@ -164,19 +165,22 @@ with st.sidebar:
         st.success("所有药物信息记录已删除！")
 
 # 主页面内容
-st.title("药物反应助手")
+st.title("💊 联合用药反应评估助手")
 
 tab = st.radio(label="选择功能", options=[
     "💊 **药物信息**",
     "🔬 **药物反应预测**",
-    "🗣️ **对话系统**"],
+    "🧬 **抗癌联用药效预测**",
+    "💬 **自由对话**"],
     captions=[
     "药物详细信息展示",
     "进行药物对之间反应预测",
-    "与生物医药大模型对话"],
+    "预测抗癌药物联合使用的疗效",
+    "与生物医药大模型进行自由对话交流"],
     horizontal=True, label_visibility="collapsed")
+
 if tab == "💊 **药物信息**":
-    st.subheader("已收录的药物信息")
+    st.subheader("📜 已收录的药物信息")
     # 显示所有药物卡片
     if "drugs" in st.session_state and len(st.session_state.drugs) > 0:
         # 创建三列布局
@@ -209,7 +213,7 @@ if tab == "💊 **药物信息**":
 
 
 if tab == "🔬 **药物反应预测**":
-    st.subheader("选择需要查看反应的药物")
+    st.subheader("🔍 选择需要查看反应的药物")
 
     if "drugs" in st.session_state and len(st.session_state.drugs) > 0:
         drug_names = [drug["name"] for drug in st.session_state.drugs]
@@ -219,7 +223,7 @@ if tab == "🔬 **药物反应预测**":
  
         st.write(f"你选择的药物是: {drug1} 和 {drug2}")
 
-        if st.button("显示药物反应"):
+        if st.button("⚡ 显示药物反应"):
             if drug1 == drug2:
                 st.write(f"不能选择相同药物！")
             # 在此处编写药物反应逻辑
@@ -241,9 +245,8 @@ if tab == "🔬 **药物反应预测**":
                 df = df.sort_values(by='可能性(%)', ascending=False).head(5)
 
                 st.dataframe(df, use_container_width=True, hide_index=True)
-        else:
-            st.write("没有任何药物记录！")
-
+    else:
+        st.write("没有任何药物记录！")
 
 # 用来切换选中药物的函数
 def toggle_drug_selection(drug_name, selected_drugs):
@@ -253,13 +256,89 @@ def toggle_drug_selection(drug_name, selected_drugs):
         selected_drugs.append(drug_name)
     st.session_state.selected_drugs = selected_drugs
 
+if tab == "🧬 **抗癌联用药效预测**":
+    st.subheader("🔬 抗癌联用药效预测")
+
+    cancer_type = st.radio(
+        "请选择癌症类型",
+        ["乳腺癌", "肠癌", "胃癌", "肝癌"],
+        horizontal=True,
+        index=0
+    )
+
+    selected_drugs = st.multiselect(
+        "请选择至少两种药物", [drug["name"] for drug in st.session_state.drugs], default=[], placeholder="请选择已收录的药物名称"
+    )
+
+    if st.button("🔍 查看联合药效预测"):
+        if len(selected_drugs) < 2:
+            st.error("请选择至少两种药物进行联合预测！")
+        else:
+            drug_information = [drug for drug in st.session_state.drugs if drug["name"] in selected_drugs]
+            drug_index = [idx for idx, drug in enumerate(st.session_state.drugs) if drug["name"] in selected_drugs]
+            drug_interaction_keys = [min(a, b) * 10 + max(a, b) for a, b in itertools.combinations(drug_index, 2)]
+
+            prompt = f"以下为几种用于{cancer_type}治疗的药物信息：\n"
+            for drug in drug_information:
+                prompt += f"药物名称{drug['name']}，药物性质简要信息{drug['property']}，药物靶点信息{drug['target']}, 药物可能的SMILES序列{drug['smiles']}\n"
+            prompt += "以下为他们之间相互作用不良反应及协同药效的可能的预测信息及发生可能性，该结果并非权威数据，仅供可能的参考所用。\n"
+            for key in drug_interaction_keys:
+                interactions = next((pair[key] for pair in st.session_state.interactions if key in pair), None)
+                drug1 = st.session_state.drugs[key // 10]['name']
+                drug2 = st.session_state.drugs[key % 10]['name']
+
+                interaction_text = "\n".join(
+                    [f"- \"{desc}\"  ({prob * 100:.2f}%)" for desc, (prob, _) in interactions.items()]
+                )
+                prompt += f"药物{drug1}与{drug2}联合用药可能有如下情况出现：{interaction_text}\n"
+
+            prompt += f"关于{cancer_type}治疗中上述几种药物联合用药与单药相比在有效性和安全性方面的差异，请基于全球权威指南（如NCCN、ESMO）、高循证等级的临床试验数据（如III期随机对照试验，RCT）以及相关研究数据库，提供极其详细的分析与说明，并提供一些数据进行量化评估"
+            
+            response_placeholder = st.empty()
+
+            try:
+                decoder = json.JSONDecoder()
+                think = True
+                answer = "🔄 模型连接中..."
+                response_placeholder.markdown(answer)
+
+                response = requests.post(
+                    f"{API_URL}stream",
+                    json={"messages": [{"role": "user", "content": prompt}]},
+                    stream=True
+                )
+                answer = "⏳ 结果生成中，请稍加等待..."
+
+                for chunk in response.iter_lines():
+                    chunk = chunk.decode("utf-8")
+                    try:
+                        obj, end = decoder.raw_decode(chunk)
+                        word = obj['message']['content']
+                        if not think:
+                            answer += word
+                            response_placeholder.markdown(answer + "▌")
+                            st.session_state.messages[-1]['content'] = answer
+                        else:
+                            response_placeholder.markdown(answer)
+                        if word == "</think>":
+                            think = False
+                            answer = ""
+                    except json.JSONDecodeError:
+                        st.error("大模型生成解析出错！请稍后再试！")
+                
+                response_placeholder.markdown(answer)
+
+            except Exception as e:
+                st.error(f"服务器繁忙！请稍后再试！")
+            
+
 example_prompts = [
     "请列出当前系统已收录的药物信息，包括药物名称、简介以及靶点信息",
     "请分析当前收录的药物在联合使用时可能产生的协同作用和拮抗作用",
     "当前收录的药物在治疗癌症上是否具有临床意义，请进行疗效与风险评估"
 ]
 
-if tab == "🗣️ **对话系统**":
+if tab == "💬 **自由对话**":
     # Display chat messages from history on app rerun
     if not st.session_state.greetings:
         st.session_state.messages.append({"role": "system", "content": "你是一名医药反应交互的大语言模型助手，请详细准确地回答用户提出的问题。"})
