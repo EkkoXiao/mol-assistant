@@ -266,9 +266,14 @@ if tab == "🧬 **抗癌联用药效预测**":
         index=0
     )
 
-    selected_drugs = st.multiselect(
-        "请选择至少两种药物", [drug["name"] for drug in st.session_state.drugs], default=[], placeholder="请选择已收录的药物名称"
-    )
+    options = [drug["name"] for drug in st.session_state.drugs]
+
+    if not options:
+        st.warning("⚠️ 当前没有可选的药物，请先添加药物信息！")
+    else:
+        selected_drugs = st.multiselect(
+            "请选择至少两种药物", options, default=[], placeholder="请选择已收录的药物名称"
+        )
 
     if st.button("🔍 查看联合药效预测"):
         if len(selected_drugs) < 2:
