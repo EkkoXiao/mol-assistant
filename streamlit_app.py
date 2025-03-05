@@ -1,6 +1,7 @@
 import json
 import re
 import time
+import pandas as pd
 import requests
 import streamlit as st
 
@@ -49,10 +50,51 @@ with st.sidebar:
 
         # 提交后处理数据
         if submit_button:
-            if drug_name:
-                drug_idx = [idx for idx, drug in enumerate(st.session_state.drugs) if drug["name"] == drug_name]
+            if drug_name and drug_property and drug_target and drug_smiles:
+                drug_idx = [idx for idx, drug in enumerate(st.session_state.drugs) if drug["name"].lower() == drug_name.lower()]
                 if drug_idx != []:
-                    st.error("药物已输入！")
+                    st.error("该药物已输入！")
+                drug_data = {
+                    "name": drug_name,
+                    "property": drug_property,
+                    "target": drug_target,
+                    "smiles": drug_smiles,
+                }
+                new_idx = len(st.session_state.drugs)
+                success = True
+                try:
+                    for idx, drug in enumerate(st.session_state.drugs):
+                        time.sleep(5)
+                        response = requests.get(
+                            f"{API_URL}/interaction",
+                            json={
+                                "drug1": drug_data,
+                                "drug2": drug
+                            }
+                        )
+                        if response.status_code == 200:
+                            interactions = response.json()["interactions"]
+                            st.session_state.interactions.append({idx * 10 + new_idx: interactions})
+                            interaction_text = "\n".join(
+                                [f"- \"{desc}\"  ({prob * 100:.2f}%)" for desc, (prob, _) in interactions.items()]
+                            )
+                            drug1_name = drug_data["name"]
+                            drug2_name = drug["name"]
+                            st.session_state.messages.append({"role": "system", "content": f"<DRUG>新增药物反应信息：药物{drug1_name}与药物{drug2_name}联合使用可能发生相互作用，以下是可能的反应类型及其概率：{interaction_text}"})
+                        else:
+                            success = False
+                            st.error(f"查询药物相互作用出错！请检查药物信息及SMILES序列合法性！")
+                except Exception as e:
+                    success = False
+                    st.error(f"服务器繁忙！请稍后再试！")
+                if success:
+                    st.session_state.drugs.append(drug_data)
+                    st.session_state.messages.append({"role": "system", "content": f"<DRUG>新增药物信息：药物名{drug_data['name']}，药物性质信息{drug_data['property']}，药物靶点信息{drug_data['target']}"})
+                    st.success(f"药物信息已直接导入！")
+            elif drug_name:
+                drug_idx = [idx for idx, drug in enumerate(st.session_state.drugs) if drug["name"].lower() == drug_name.lower()]
+                if drug_idx != []:
+                    st.error("该药物已输入！")
                 try: 
                     response = requests.get(
                         f"{API_URL}/info",
@@ -70,43 +112,56 @@ with st.sidebar:
                         drug_data = response.json()
                         new_idx = len(st.session_state.drugs)
                         success = True
-                        st.session_state.messages.append({"role": "system", "content": f"新增药物信息：药物名{drug_data['name']}，药物性质信息{drug_data['property']}，药物靶点信息{drug_data['target']}"})
-                        for idx, drug in enumerate(st.session_state.drugs):
-                            time.sleep(5)
-                            response = requests.get(
-                                f"{API_URL}/interaction",
-                                json={
-                                    "drug1": drug_data,
-                                    "drug2": drug
-                                }
-                            )
-                            if response.status_code == 200:
-                                interactions = response.json()["interactions"]
-                                st.session_state.interactions.append({idx * 10 + new_idx: interactions})
-                                interaction_text = "\n".join(
-                                    [f"- \"{desc}\"  ({prob * 100:.2f}%)" for desc, (prob, _) in interactions.items()]
+                        try:
+                            for idx, drug in enumerate(st.session_state.drugs):
+                                time.sleep(5)
+                                response = requests.get(
+                                    f"{API_URL}/interaction",
+                                    json={
+                                        "drug1": drug_data,
+                                        "drug2": drug
+                                    }
                                 )
-                                drug1_name = drug_data["name"]
-                                drug2_name = drug["name"]
-                                st.session_state.messages.append({"role": "system", "content": f"新增药物反应信息：药物{drug1_name}与药物{drug2_name}联合使用可能发生相互作用，以下是可能的反应类型及其概率：{interaction_text}"})
-                            else:
-                                success = False
-                                st.error(f"请求失败，状态码：{response.status_code}")
-                                st.error(f"错误详情：{response.text}")
+                                if response.status_code == 200:
+                                    interactions = response.json()["interactions"]
+                                    st.session_state.interactions.append({idx * 10 + new_idx: interactions})
+                                    interaction_text = "\n".join(
+                                        [f"- \"{desc}\"  ({prob * 100:.2f}%)" for desc, (prob, _) in interactions.items()]
+                                    )
+                                    drug1_name = drug_data["name"]
+                                    drug2_name = drug["name"]
+                                    st.session_state.messages.append({"role": "system", "content": f"<DRUG>新增药物反应信息：药物{drug1_name}与药物{drug2_name}联合使用可能发生相互作用，以下是可能的反应类型及其概率：{interaction_text}"})
+                                else:
+                                    success = False
+                                    st.error(f"查询药物相互作用出错！请检查药物信息")
+                        except Exception as e:
+                            success = False
+                            st.error(f"服务器繁忙！请稍后再试！")
                         if success:
                             st.session_state.drugs.append(drug_data)
-                            st.success(f"药物 {drug_name} 信息已成功输入！")
+                            st.session_state.messages.append({"role": "system", "content": f"<DRUG>新增药物信息：药物名{drug_data['name']}，药物性质信息{drug_data['property']}，药物靶点信息{drug_data['target']}"})
+                            st.success(f"药物信息查询并导入成功！")
+                    elif response.status_code == 404:
+                        st.error("未查询到该药物，请确定输入为标准英文药物名称！")
                     else:
-                        st.error(f"请求失败，状态码：{response.status_code}")
-                        st.error(f"错误详情：{response.text}")
+                        st.error("药物信息导入出错！")
                 except Exception as e:
-                    st.error(f"请求出错：{str(e)}")
+                    st.error(f"服务器繁忙！请稍后再试！")
 
-    delete_all_button = st.button("删除所有药物", key="delete_all", help="删除所有已保存的药物", use_container_width=True, 
-                                  on_click=lambda: (st.session_state.pop('drugs', None), st.session_state.pop('interactions', None)))
-
+    delete_all_button = st.button(
+        "删除所有药物", 
+        key="delete_all", 
+        help="删除所有已保存的药物", 
+        use_container_width=True, 
+        on_click=lambda: (
+            st.session_state.pop('drugs', None),
+            st.session_state.pop('interactions', None),
+            setattr(st.session_state, "messages", [msg for msg in st.session_state.get("messages", []) 
+                                                if not (msg["role"] == "system" and msg["content"].startswith("<DRUG>"))])
+        )
+    )
     if delete_all_button:
-        st.success("所有药物已删除！")
+        st.success("所有药物信息记录已删除！")
 
 # 主页面内容
 st.title("药物反应助手")
@@ -121,25 +176,33 @@ tab = st.radio(label="选择功能", options=[
     "与生物医药大模型对话"],
     horizontal=True, label_visibility="collapsed")
 if tab == "💊 **药物信息**":
-    st.subheader("已提交的药物卡片")
+    st.subheader("已收录的药物信息")
     # 显示所有药物卡片
     if "drugs" in st.session_state and len(st.session_state.drugs) > 0:
         # 创建三列布局
         cols = st.columns(3)
         for i, drug in enumerate(st.session_state.drugs):
-            # 每个药物显示一个卡片，使用 modulos 来分配卡片到各列
-            col = cols[i % 3]  # 循环放入三列
+            col = cols[i % 3]
             with col:
-                # 使用Markdown内嵌HTML格式的卡片样式
                 card_html = f"""
-                <div style="background-image: url('https://cdn.jsdelivr.net/gh/EkkoXiao/BlogPic/Form.jpg'); background-size: cover; background-position: left; border-radius: 15px; padding: 20px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); text-align: left;">
-                    <h3>{drug['name']}</h3>
-                    <p><strong>性质信息:</strong> {drug['property'] if drug['property'] != "" else "暂无信息"}</p>
-                    <p><strong>靶点信息:</strong> {drug['target'] if drug['target'] != "" else "暂无信息"}</p>
-                    <p><strong>SMILES序列:</strong> {drug['smiles'] if drug['smiles'] != "" else "暂无信息"}</p>
+                <div style="background-image: url('https://cdn.jsdelivr.net/gh/EkkoXiao/BlogPic/Form.jpg'); 
+                            background-size: cover; 
+                            background-position: left; 
+                            border-radius: 15px; 
+                            padding: 20px; 
+                            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); 
+                            text-align: left; 
+                            min-height: 300px; /* 固定高度 */
+                            display: flex;
+                            flex-direction: column;">
+                    <h3 style="margin: 0; font-size: 1.2em;">{drug['name']}</h3>
+                    <div style="flex-grow: 1; overflow-y: auto; max-height: 300px; min-height: 300px; padding-right: 5px;"> 
+                        <p style="margin: 5px 0; font-size: 0.9em;"><strong>性质信息:</strong> {drug['property'] if drug['property'] != "" else "暂无信息"}</p>
+                        <p style="margin: 5px 0; font-size: 0.9em;"><strong>靶点信息:</strong> {drug['target'] if drug['target'] != "" else "暂无信息"}</p>
+                        <p style="margin: 5px 0; font-size: 0.9em;"><strong>SMILES序列:</strong> {drug['smiles'] if drug['smiles'] != "" else "暂无信息"}</p>
+                    </div>
                 </div>
                 """
-                # 渲染HTML内容
                 st.markdown(card_html, unsafe_allow_html=True)
     else:
         st.write("没有任何药物记录！")
@@ -168,37 +231,18 @@ if tab == "🔬 **药物反应预测**":
                 interactions = next((pair[idx_key] for pair in st.session_state.interactions if idx_key in pair), None)
             
                 st.subheader("反应类型及可能性")
-                html_code = """
-                <style>
-                table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    margin-top: 20px;
-                }
-                th, td {
-                    text-align: left;
-                    padding: 8px;
-                    border: 1px solid #ddd;
-                }
-                th {
-                    background-color: #f2f2f2;
-                    font-weight: bold;
-                }
-                </style>
-                <table>
-                <tr>
-                    <th>反应类型</th>
-                    <th>可能性 (%)</th>
-                </tr>
-                """
 
-                for reaction_type, (probability, idx) in interactions.items():
-                    html_code += f"<tr><td>{reaction_type}</td><td>{probability * 100:.2f}</td></tr>"
+                df = pd.DataFrame(interactions.items(), columns=['交互类型', '数据'])
+                df[['可能性(%)', '索引']] = pd.DataFrame(df['数据'].tolist(), index=df.index)
+                df = df[['交互类型', '可能性(%)']]
 
-                html_code += "</table>"
-                st.markdown(html_code, unsafe_allow_html=True)
-    else:
-        st.write("没有任何药物记录！")
+                df['可能性(%)'] = df['可能性(%)'].mul(100).map(lambda x: f"{x:.2f}")
+
+                df = df.sort_values(by='可能性(%)', ascending=False).head(5)
+
+                st.dataframe(df, use_container_width=True, hide_index=True)
+        else:
+            st.write("没有任何药物记录！")
 
 
 # 用来切换选中药物的函数
@@ -278,7 +322,7 @@ if tab == "🗣️ **对话系统**":
                             think = False
                             answer = ""
                     except json.JSONDecodeError:
-                        st.error("解析中途出错！")
+                        st.error("大模型生成解析出错！请稍后再试！")
                 
                 response_placeholder.markdown(answer)
                 st.session_state.messages[-1]['content'] = answer
@@ -286,4 +330,6 @@ if tab == "🗣️ **对话系统**":
                 st.rerun()
 
         except Exception as e:
-            st.error(f"请求出错：{e}")
+            st.error(f"服务器繁忙！请稍后再试！")
+
+            st.rerun()
