@@ -34,6 +34,10 @@ if "button_pressed" not in st.session_state:
     st.session_state.button_pressed = ""
 if "disabled" not in st.session_state:
     st.session_state.disabled = False
+if "selected_drugs" not in st.session_state:
+    st.session_state.selected_drugs = []
+if "cancer_reply" not in st.session_state:
+    st.session_state.cancer_reply = ""
 
 # 创建左侧sidebar
 with st.sidebar:
@@ -265,19 +269,27 @@ if tab == "🧬 **抗癌联用药效预测**":
 
     options = [drug["name"] for drug in st.session_state.drugs]
 
+    def update_selected_drugs():
+        st.session_state.selected_drugs = st.session_state.selected_drugs_current
+
     if not options:
         st.warning("⚠️ 当前没有可选的药物，请先添加药物信息！")
     else:
-        selected_drugs = st.multiselect(
-            "请选择至少两种药物", options, default=[], placeholder="请选择已收录的药物名称"
+        st.multiselect(
+            "请选择至少两种药物", 
+            options, 
+            default=st.session_state.selected_drugs,  # 设定默认值
+            key="selected_drugs_current",  # 绑定到一个临时变量
+            placeholder="请选择已收录的药物名称",
+            on_change=update_selected_drugs  # 当选择变化时调用回调函数
         )
 
         if st.button("🔍 查看联合药效预测"):
-            if len(selected_drugs) < 2:
+            if len(st.session_state.selected_drugs) < 2:
                 st.warning("请选择至少两种药物进行联合预测！")
             else:
-                drug_information = [drug for drug in st.session_state.drugs if drug["name"] in selected_drugs]
-                drug_index = [idx for idx, drug in enumerate(st.session_state.drugs) if drug["name"] in selected_drugs]
+                drug_information = [drug for drug in st.session_state.drugs if drug["name"] in st.session_state.selected_drugs]
+                drug_index = [idx for idx, drug in enumerate(st.session_state.drugs) if drug["name"] in st.session_state.selected_drugs]
                 drug_interaction_keys = [min(a, b) * 10 + max(a, b) for a, b in itertools.combinations(drug_index, 2)]
 
                 prompt_cancer = f"以下为几种用于{cancer_type}治疗的药物信息：\n"
@@ -297,6 +309,8 @@ if tab == "🧬 **抗癌联用药效预测**":
                 prompt_cancer += f"关于{cancer_type}治疗中上述几种药物联合用药与单药相比在有效性和安全性方面的差异，请基于全球权威指南（如NCCN、ESMO）、高循证等级的临床试验数据（如III期随机对照试验，RCT）以及相关研究数据库，提供详细的分析与说明，可能用做参考的量化评估数据例如：总生存期（OS），无进展生存期（PFS），客观缓解率（ORR），3 级及以上不良事件发生率，治疗相关死亡率等"
                 
                 response_placeholder = st.empty()
+
+                response_placeholder.markdown(st.session_state.cancer_reply)
 
                 try:
                     decoder = json.JSONDecoder()
@@ -319,6 +333,7 @@ if tab == "🧬 **抗癌联用药效预测**":
                             if not think:
                                 answer += word
                                 response_placeholder.markdown(answer + "▌")
+                                st.session_state.cancer_reply = answer
                             else:
                                 response_placeholder.markdown(answer)
                             if word == "</think>":
