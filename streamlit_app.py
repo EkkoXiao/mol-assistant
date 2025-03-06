@@ -65,7 +65,6 @@ with st.sidebar:
                 success = True
                 try:
                     for idx, drug in enumerate(st.session_state.drugs):
-                        time.sleep(5)
                         response = requests.get(
                             f"{API_URL}/interaction",
                             json={
@@ -115,7 +114,6 @@ with st.sidebar:
                         success = True
                         try:
                             for idx, drug in enumerate(st.session_state.drugs):
-                                time.sleep(5)
                                 response = requests.get(
                                     f"{API_URL}/interaction",
                                     json={
@@ -226,7 +224,6 @@ if tab == "🔬 **药物反应预测**":
         if st.button("⚡ 显示药物反应"):
             if drug1 == drug2:
                 st.warning(f"不能选择相同药物！")
-            # 在此处编写药物反应逻辑
             else:
                 drug1_idx = next((idx for idx, drug in enumerate(st.session_state.drugs) if drug["name"] == drug1), None)
                 drug2_idx = next((idx for idx, drug in enumerate(st.session_state.drugs) if drug["name"] == drug2), None)
@@ -322,7 +319,6 @@ if tab == "🧬 **抗癌联用药效预测**":
                             if not think:
                                 answer += word
                                 response_placeholder.markdown(answer + "▌")
-                                st.session_state.messages[-1]['content'] = answer
                             else:
                                 response_placeholder.markdown(answer)
                             if word == "</think>":
