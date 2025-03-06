@@ -284,7 +284,12 @@ if tab == "🧬 **抗癌联用药效预测**":
             on_change=update_selected_drugs  # 当选择变化时调用回调函数
         )
 
-        if st.button("🔍 查看联合药效预测"):
+        cancer_button = st.button("🔍 查看联合药效预测")
+
+        response_placeholder = st.empty()
+        response_placeholder.markdown(st.session_state.cancer_reply)
+
+        if cancer_button:
             if len(st.session_state.selected_drugs) < 2:
                 st.warning("请选择至少两种药物进行联合预测！")
             else:
@@ -308,10 +313,6 @@ if tab == "🧬 **抗癌联用药效预测**":
 
                 prompt_cancer += f"关于{cancer_type}治疗中上述几种药物联合用药与单药相比在有效性和安全性方面的差异，请基于全球权威指南（如NCCN、ESMO）、高循证等级的临床试验数据（如III期随机对照试验，RCT）以及相关研究数据库，提供详细的分析与说明，可能用做参考的量化评估数据例如：总生存期（OS），无进展生存期（PFS），客观缓解率（ORR），3 级及以上不良事件发生率，治疗相关死亡率等"
                 
-                response_placeholder = st.empty()
-
-                response_placeholder.markdown(st.session_state.cancer_reply)
-
                 try:
                     decoder = json.JSONDecoder()
                     think = True
