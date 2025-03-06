@@ -125,8 +125,6 @@ with st.sidebar:
                                         "drug2": drug
                                     }
                                 )
-                                print(drug_data.smiles)
-                                print(drug.smiles)
                                 if response.status_code == 200:
                                     interactions = response.json()["interactions"]
                                     st.session_state.interactions.append({idx * 10 + new_idx: interactions})
