@@ -17,9 +17,9 @@ def load_html(file_path):
 API_URL = "https://f895-43-247-185-76.ngrok-free.app/"
 
 # 调用缓存函数
-# html_content = load_html("page.html")
+html_content = load_html("page.html")
 
-# st.markdown(html_content, unsafe_allow_html=True)
+st.markdown(html_content, unsafe_allow_html=True)
 
 # 初始化聊天记录
 if "messages" not in st.session_state:
@@ -240,7 +240,7 @@ if tab == "🔬 **药物反应预测**":
                 df[['可能性(%)', '索引']] = pd.DataFrame(df['数据'].tolist(), index=df.index)
                 df = df[['交互类型', '可能性(%)']]
 
-                df['可能性(%)'] = df['可能性(%)'].mul(100).map(lambda x: f"{x:.2f}")
+                df['可能性(%)'] = df['可能性(%)'].mul(100).round(2)
 
                 df = df.sort_values(by='可能性(%)', ascending=False).head(5)
 
@@ -283,10 +283,10 @@ if tab == "🧬 **抗癌联用药效预测**":
             drug_index = [idx for idx, drug in enumerate(st.session_state.drugs) if drug["name"] in selected_drugs]
             drug_interaction_keys = [min(a, b) * 10 + max(a, b) for a, b in itertools.combinations(drug_index, 2)]
 
-            prompt = f"以下为几种用于{cancer_type}治疗的药物信息：\n"
+            prompt_cancer = f"以下为几种用于{cancer_type}治疗的药物信息：\n"
             for drug in drug_information:
-                prompt += f"药物名称{drug['name']}，药物性质简要信息{drug['property']}，药物靶点信息{drug['target']}, 药物可能的SMILES序列{drug['smiles']}\n"
-            prompt += "以下为他们之间相互作用不良反应及协同药效的可能的预测信息及发生可能性，该结果并非权威数据，仅供可能的参考所用。\n"
+                prompt_cancer += f"药物名称{drug['name']}，药物性质简要信息{drug['property']}，药物靶点信息{drug['target']}, 药物可能的SMILES序列{drug['smiles']}\n"
+            prompt_cancer += "以下为他们之间相互作用不良反应及协同药效的可能的预测信息及发生可能性，该结果并非权威数据，仅供可能的参考所用。\n"
             for key in drug_interaction_keys:
                 interactions = next((pair[key] for pair in st.session_state.interactions if key in pair), None)
                 drug1 = st.session_state.drugs[key // 10]['name']
@@ -295,9 +295,9 @@ if tab == "🧬 **抗癌联用药效预测**":
                 interaction_text = "\n".join(
                     [f"- \"{desc}\"  ({prob * 100:.2f}%)" for desc, (prob, _) in interactions.items()]
                 )
-                prompt += f"药物{drug1}与{drug2}联合用药可能有如下情况出现：{interaction_text}\n"
+                prompt_cancer += f"药物{drug1}与{drug2}联合用药可能有如下情况出现：{interaction_text}\n"
 
-            prompt += f"关于{cancer_type}治疗中上述几种药物联合用药与单药相比在有效性和安全性方面的差异，请基于全球权威指南（如NCCN、ESMO）、高循证等级的临床试验数据（如III期随机对照试验，RCT）以及相关研究数据库，提供极其详细的分析与说明，并提供一些数据进行量化评估"
+            prompt_cancer += f"关于{cancer_type}治疗中上述几种药物联合用药与单药相比在有效性和安全性方面的差异，请基于全球权威指南（如NCCN、ESMO）、高循证等级的临床试验数据（如III期随机对照试验，RCT）以及相关研究数据库，提供极其详细的分析与说明，并提供一些数据进行量化评估"
             
             response_placeholder = st.empty()
 
@@ -309,7 +309,7 @@ if tab == "🧬 **抗癌联用药效预测**":
 
                 response = requests.post(
                     f"{API_URL}stream",
-                    json={"messages": [{"role": "user", "content": prompt}]},
+                    json={"messages": [{"role": "user", "content": prompt_cancer}]},
                     stream=True
                 )
                 answer = "⏳ 结果生成中，请稍加等待..."
