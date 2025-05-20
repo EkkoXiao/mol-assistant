@@ -14,7 +14,7 @@ def load_html(file_path):
     with open(file_path, "r", encoding="utf-8") as file:
         return file.read()
 
-API_URL = "https://f895-43-247-185-76.ngrok-free.app/"
+API_URL = "https://a11d-43-247-185-76.ngrok-free.app"
 
 # 调用缓存函数
 html_content = load_html("page.html")
