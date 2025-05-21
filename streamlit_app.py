@@ -530,8 +530,8 @@ elif function == "🧬 抗癌药物组合推荐助手":
             }
             for t in st.session_state.selected_targets]
             # TODO: 根据药物以及 DDI 结果，获得药物组合
-            # TODO: 访问 DDI 模型参照 L81 开始的内容，路径是 {API_URL}/interaction
-            # TODO: 访问大语言模型 (Deepseek32b) 声称解释的路径是 {API_URL}/generate
+            # TODO: 访问 DDI 模型参照 L88 开始的内容，路径是 {API_URL}/interaction
+            # TODO: 可以访问大语言模型 (Deepseek32b) 生成解释，路径是 {API_URL}/generate
             combo_recommendations = []
             for d1, d2 in itertools.combinations(all_drugs, 2):
                 avg_score = round((d1["score"] + d2["score"]) / 2, 3)
