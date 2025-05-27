@@ -86,6 +86,8 @@ with st.sidebar:
                     success = True
                     try:
                         for idx, drug in enumerate(st.session_state.drugs):
+                            print(drug_data)
+                            print(drug)
                             response = requests.get(
                                 f"{API_URL}/interaction",
                                 json={
@@ -213,16 +215,9 @@ with st.sidebar:
                 st.success(f"✅ 已选择癌症类型：{cancer_type}")
 
                 # TODO 调用后端，获取癌症对应靶点信息
-                def get_cancer_targets(cancer_type):
-                    cancers = {
-                        "乳腺癌": [{"name": "乳腺癌靶点1", "info": "其他信息"},{"name": "乳腺癌靶点2", "info": "其他信息"}],
-                        "胃癌": [{"name": "胃癌靶点1", "info": "其他信息"},{"name": "胃癌靶点2", "info": "其他信息"}],
-                        "肠癌": [{"name": "肠癌靶点1", "info": "其他信息"},{"name": "肠癌靶点2", "info": "其他信息"}],
-                        "肝癌": [{"name": "肝癌靶点1", "info": "其他信息"},{"name": "肝癌靶点2", "info": "其他信息"}],
-                    }
-                    return cancers[cancer_type]
-                
-                st.session_state.cancer_targets = get_cancer_targets(st.session_state.cancer_type)
+                with open("cancer_targets.json", "r") as f:
+                    cancer_targets = json.load(f)
+                st.session_state.cancer_targets = cancer_targets[cancer_type]
 
 # 主页面内容
 if function == None:
@@ -522,24 +517,87 @@ elif function == "🧬 抗癌药物组合推荐助手":
         # TODO: 根据靶点信息进行药物组合推荐
         def drug_recommendation(targets):
             # 根据靶点获得所有药物，可以访问后端实现
-            all_drugs = [
-            {
-                "target": t["name"],
-                "drug": f"{t['name']}的药物",
-                "score": round(random.uniform(0, 1), 3)  # DTI 的分数
-            }
-            for t in st.session_state.selected_targets]
+            df = pd.read_csv("drug_target_relations_with_atc.csv")
+            target_uniprots = [t["uniprotId"] for t in targets]
+            # print(target_uniprots)
+            target_drugs = df[df["target_uniprot"].isin(target_uniprots)]
+            target_drugs = target_drugs[target_drugs['atc_codes'].str.contains('^L01|^L02', na=False, regex=True)]
+            # print(target_drugs)
+            unique_drugs = target_drugs["drug_name"].drop_duplicates().tolist()
+            all_drugs = []
+            for drug_name in unique_drugs:
+                drug_targets = target_drugs[target_drugs["drug_name"] == drug_name]["target_uniprot"].tolist()
+                target_names = [t["name"] for t in targets if t["uniprotId"] in drug_targets]
+                target_score = [t["score"] for t in targets if t["uniprotId"] in drug_targets]
+                drug_info = {
+                    "drug": drug_name,
+                    "targets": target_names,
+                    "score": round(sum(target_score), 3)  # DTI 的分数
+                }
+                all_drugs.append(drug_info)
+            all_drugs.sort(key=lambda x: x["score"], reverse=True)
+            print("all_drugs: ", all_drugs)
+            if len(all_drugs) < 2:
+                st.warning("⚠️ 找到的药物数量不足，无法生成组合推荐")
+                return []
+            
             # TODO: 根据药物以及 DDI 结果，获得药物组合
             # TODO: 访问 DDI 模型参照 L88 开始的内容，路径是 {API_URL}/interaction
             # TODO: 可以访问大语言模型 (Deepseek32b) 生成解释，路径是 {API_URL}/generate
             combo_recommendations = []
             for d1, d2 in itertools.combinations(all_drugs, 2):
-                avg_score = round((d1["score"] + d2["score"]) / 2, 3)
+                interaction_score = 0
+                try:
+                    drug1_data = {
+                        "name": d1["drug"],
+                        "property": "",
+                        "target": "",
+                        "smiles": ""
+                    }
+                    drug2_data = {
+                        "name": d2["drug"],
+                        "property": "",
+                        "target": "",
+                        "smiles": ""
+                    }
+                    response = requests.get(
+                        f"{API_URL}/interaction",
+                        json={"drug1": drug1_data, "drug2": drug2_data},
+                    )
+                    if response.status_code == 200:
+                        interactions = response.json()["interactions"]
+                        if interactions:
+                            interaction_score = sum(prob_score[0] for prob_score in interactions.values())
+                        else:
+                            interaction_score = 0
+                    else:
+                        st.error(f"DDI 模型连接失败！请稍后再试！")
+                        return []
+                except Exception as e:
+                    print(e)
+                    st.error(f"DDI 模型连接失败！请稍后再试！")
+                    return []
+
+                avg_score = round((d1["score"] + d2["score"]) * (1 - interaction_score) / 2, 3)
+                
+                # 使用大语言模型解释药物组合的抗癌效果
+                # prompt = f"根据下面的信息，使用一句话解释药物组合{d1['drug']}和{d2['drug']}是如何抗癌的。"
+                # prompt += f"药物1：{d1['drug']}，药物2：{d2['drug']}，药物1的靶点：{d1['targets']}，药物2的靶点：{d2['targets']}"
+                # response = requests.post(
+                #     f"{API_URL}/generate",
+                #     json={"messages": [{"role": "user", "content": prompt}]},
+                #     timeout=120
+                # )
+                # explanation = response.json()["generated_text"]
+                # # 使用推理模型时需要去除推理文本
+                # explanation = explanation.split("</think>")[1].strip()
+
                 combo = {
                     "drug1": d1["drug"],
                     "drug2": d2["drug"],
                     "score": avg_score,
                     "explanation": f"组合 {d1['drug']} 和 {d2['drug']} 可能具有潜在的协同抗癌效应。"
+                    # "explanation": explanation
                 }
                 combo_recommendations.append(combo)
 
