@@ -16,6 +16,7 @@ def load_html(file_path):
         return file.read()
 
 API_URL = "https://a11d-43-247-185-76.ngrok-free.app/"
+# API_URL = "http://localhost:8000"
 
 # 调用缓存函数
 html_content = load_html("page.html")
@@ -213,11 +214,15 @@ with st.sidebar:
             else:
                 st.session_state.cancer_type = cancer_type
                 st.success(f"✅ 已选择癌症类型：{cancer_type}")
-
+                cancer_type_en = cancer_type.replace("乳腺癌", "breast_cancer").replace("胃癌", "stomach_cancer").replace("肠癌", "colon_cancer").replace("肝癌", "liver_cancer")   
                 # TODO 调用后端，获取癌症对应靶点信息
-                with open("cancer_targets.json", "r") as f:
-                    cancer_targets = json.load(f)
-                st.session_state.cancer_targets = cancer_targets[cancer_type]
+                try:
+                    resp = requests.get(f"{API_URL}/cancer_targets", params={"cancer_type": cancer_type_en})
+                    resp.raise_for_status()
+                    st.session_state.cancer_targets = resp.json()["targets"]
+                except Exception as e:
+                    st.error("靶点获取失败，请稍后再试！")
+
 
 # 主页面内容
 if function == None:
@@ -515,101 +520,26 @@ elif function == "🧬 抗癌药物组合推荐助手":
         st.json(st.session_state.selected_targets)
 
         # TODO: 根据靶点信息进行药物组合推荐
-        def drug_recommendation(targets):
-            # 根据靶点获得所有药物，可以访问后端实现
-            df = pd.read_csv("drug_target_relations_with_atc.csv")
-            target_uniprots = [t["uniprotId"] for t in targets]
-            # print(target_uniprots)
-            target_drugs = df[df["target_uniprot"].isin(target_uniprots)]
-            target_drugs = target_drugs[target_drugs['atc_codes'].str.contains('^L01|^L02', na=False, regex=True)]
-            # print(target_drugs)
-            unique_drugs = target_drugs["drug_name"].drop_duplicates().tolist()
-            all_drugs = []
-            for drug_name in unique_drugs:
-                drug_targets = target_drugs[target_drugs["drug_name"] == drug_name]["target_uniprot"].tolist()
-                target_names = [t["name"] for t in targets if t["uniprotId"] in drug_targets]
-                target_score = [t["score"] for t in targets if t["uniprotId"] in drug_targets]
-                drug_info = {
-                    "drug": drug_name,
-                    "targets": target_names,
-                    "score": round(sum(target_score), 3)  # DTI 的分数
-                }
-                all_drugs.append(drug_info)
-            all_drugs.sort(key=lambda x: x["score"], reverse=True)
-            print("all_drugs: ", all_drugs)
-            if len(all_drugs) < 2:
-                st.warning("⚠️ 找到的药物数量不足，无法生成组合推荐")
-                return []
-            
-            # TODO: 根据药物以及 DDI 结果，获得药物组合
-            # TODO: 访问 DDI 模型参照 L88 开始的内容，路径是 {API_URL}/interaction
-            # TODO: 可以访问大语言模型 (Deepseek32b) 生成解释，路径是 {API_URL}/generate
-            combo_recommendations = []
-            for d1, d2 in itertools.combinations(all_drugs, 2):
-                interaction_score = 0
-                try:
-                    drug1_data = {
-                        "name": d1["drug"],
-                        "property": "",
-                        "target": "",
-                        "smiles": ""
-                    }
-                    drug2_data = {
-                        "name": d2["drug"],
-                        "property": "",
-                        "target": "",
-                        "smiles": ""
-                    }
-                    response = requests.get(
-                        f"{API_URL}/interaction",
-                        json={"drug1": drug1_data, "drug2": drug2_data},
-                    )
-                    if response.status_code == 200:
-                        interactions = response.json()["interactions"]
-                        if interactions:
-                            interaction_score = sum(prob_score[0] for prob_score in interactions.values())
-                        else:
-                            interaction_score = 0
-                    else:
-                        st.error(f"DDI 模型连接失败！请稍后再试！")
-                        return []
-                except Exception as e:
-                    print(e)
-                    st.error(f"DDI 模型连接失败！请稍后再试！")
-                    return []
-
-                avg_score = round((d1["score"] + d2["score"]) * (1 - interaction_score) / 2, 3)
-                
-                # 使用大语言模型解释药物组合的抗癌效果
-                # prompt = f"根据下面的信息，使用一句话解释药物组合{d1['drug']}和{d2['drug']}是如何抗癌的。"
-                # prompt += f"药物1：{d1['drug']}，药物2：{d2['drug']}，药物1的靶点：{d1['targets']}，药物2的靶点：{d2['targets']}"
-                # response = requests.post(
-                #     f"{API_URL}/generate",
-                #     json={"messages": [{"role": "user", "content": prompt}]},
-                #     timeout=120
-                # )
-                # explanation = response.json()["generated_text"]
-                # # 使用推理模型时需要去除推理文本
-                # explanation = explanation.split("</think>")[1].strip()
-
-                combo = {
-                    "drug1": d1["drug"],
-                    "drug2": d2["drug"],
-                    "score": avg_score,
-                    "explanation": f"组合 {d1['drug']} 和 {d2['drug']} 可能具有潜在的协同抗癌效应。"
-                    # "explanation": explanation
-                }
-                combo_recommendations.append(combo)
-
-            return combo_recommendations
-        
         if st.button("🔍 生成药物组合推荐"):
             st.session_state.recommendation_result = []
             if not st.session_state.selected_targets:
                 st.warning("⚠️ 请先选择至少一个靶点")
             else:
-                st.session_state.recommendation_result = drug_recommendation(st.session_state.selected_targets)
-                st.success("✅ 药物组合推荐已生成")
+                try:
+                    resp = requests.post(
+                        f"{API_URL}/recommend_combo",
+                        json={"targets": st.session_state.selected_targets},
+                        timeout=120
+                    )
+                    resp.raise_for_status()
+                    st.session_state.recommendation_result = resp.json()["combos"]
+                    if len(st.session_state.recommendation_result) > 0:
+                        st.success("✅ 药物组合推荐已生成")
+                    else:
+                        st.warning("⚠️ 未找到合适的药物组合，请选择更多靶点")
+                except Exception as e:
+                    st.error("推荐生成超时，请稍后再试！")
+
 
         if st.session_state.recommendation_result:
             st.subheader("💊 推荐的药物组合")
