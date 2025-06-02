@@ -53,6 +53,8 @@ if "recommendation_result" not in st.session_state:
     st.session_state.recommendation_result = []
 if "selected_comb_cnt" not in st.session_state:
     st.session_state.selected_comb_cnt = 2
+if "recommendation_generated" not in st.session_state:
+    st.session_state.recommendation_generated = False
 
 # 创建左侧sidebar
 with st.sidebar:
@@ -520,13 +522,14 @@ elif function == "🧬 抗癌药物组合推荐助手":
         # st.json(st.session_state.selected_targets)
         # 选择推荐的药物组合数量
         num_drugs = st.slider("💊 请选择推荐药物组合的数量", min_value=2, max_value=4, value=2)
-        st.session_state.selected_comb_cnt = num_drugs
 
         # TODO: 根据靶点信息进行药物组合推荐
         if st.button("🔍 生成药物组合推荐"):
+            st.session_state.selected_comb_cnt = num_drugs
             st.session_state.recommendation_result = []
             if not st.session_state.selected_targets:
                 st.warning("⚠️ 请先选择至少一个靶点")
+                st.session_state.recommendation_generated = False  # 清除状态
             else:
                 try:
                     resp = requests.post(
@@ -538,12 +541,15 @@ elif function == "🧬 抗癌药物组合推荐助手":
                     resp.raise_for_status()
                     st.session_state.recommendation_result = resp.json()["combos"]
                     if len(st.session_state.recommendation_result) > 0:
-                        st.success("✅ 药物组合推荐已生成")
+                        st.session_state.recommendation_generated = True
                     else:
                         st.warning("⚠️ 未找到合适的药物组合，请选择更多靶点")
+                        st.session_state.recommendation_generated = False
                 except Exception as e:
                     st.error("推荐生成超时，请稍后再试！")
 
+        if st.session_state.recommendation_generated:
+            st.success("✅ 药物组合推荐已生成")
 
         # 根据分数设置颜色
         def get_score_color(score):
@@ -592,10 +598,11 @@ elif function == "🧬 抗癌药物组合推荐助手":
                             '>
                                 <div style='
                                     background: linear-gradient(145deg, #bbdefb, #e3f2fd);
-                                    padding: 35px;
+                                    padding: 25px;
                                     border-radius: 10px;
                                     text-align: center;
-                                    height:80%;
+                                    height: 70%;
+                                    width: 80%;
                                     flex-grow:0.5;
                                     overflow-y:auto;
                                     flex-direction: column;                                    
@@ -656,11 +663,11 @@ elif function == "🧬 抗癌药物组合推荐助手":
                             '>
                                 <div style='
                                     background: linear-gradient(145deg, #f8bbd0, #fce4ec);
-                                    padding: 35px;
+                                    padding: 25px;
                                     border-radius: 10px;
                                     text-align: center;
-                                    width:80%;
-                                    height:80%;
+                                    height: 70%;
+                                    width: 80%;
                                     flex-grow:0.5;
                                     overflow-y:auto;
                                     flex-direction: column;
@@ -672,17 +679,110 @@ elif function == "🧬 抗癌药物组合推荐助手":
                             </div>
                         """, unsafe_allow_html=True)
 
+                    if st.session_state.selected_comb_cnt == 3:
+                        _, col_mid, _ = st.columns([0.75, 1, 0.75])
+                        with col_mid:
+                            st.markdown(f"""
+                            <div style='
+                                height: 160px;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                            '>
+                                <div style='
+                                    background: linear-gradient(145deg, #fff9c4, #fffde7);
+                                    padding: 25px;
+                                    border-radius: 10px;
+                                    text-align: center;
+                                    height: 70%;
+                                    width: 80%;
+                                    flex-grow:0.5;
+                                    overflow-y:auto;
+                                    flex-direction: column;
+                                    box-shadow: 0 4px 8px rgba(255, 193, 7, 0.2);
+                                    border-left: 4px solid #FFC107;
+                                '>
+                                    <h3 style='margin:0; color:#ff6f00;'>{"#DRUG3"}</h3>
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
+                            
+                    elif st.session_state.selected_comb_cnt == 4:
+                        _, col_left, col_right, _ = st.columns([0.25, 1, 1, 0.25])
+                        with col_left:
+                            st.markdown(f"""
+                                <div style='
+                                    height: 160px;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                '>
+                                    <div style='
+                                        background: linear-gradient(145deg, #fff9c4, #fffde7);
+                                        padding: 25px;
+                                        border-radius: 10px;
+                                        text-align: center;
+                                        height: 70%;
+                                        width: 80%;
+                                        flex-grow:0.5;
+                                        overflow-y:auto;
+                                        flex-direction: column;
+                                        box-shadow: 0 4px 8px rgba(255, 193, 7, 0.2);
+                                        border-left: 4px solid #FFC107;
+                                    '>
+                                        <h3 style='margin:0; color:#ff6f00;'>{"#DRUG3"}</h3>
+                                    </div>
+                                </div>
+                            """, unsafe_allow_html=True)
+                        with col_right:
+                            st.markdown(f"""
+                                <div style='
+                                    height: 160px;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                '>
+                                    <div style='
+                                        background: linear-gradient(145deg, #c8e6c9, #e8f5e9);
+                                        padding: 25px;
+                                        border-radius: 10px;
+                                        text-align: center;
+                                        height: 70%;
+                                        width: 80%;
+                                        flex-grow:0.5;
+                                        overflow-y:auto;
+                                        flex-direction: column;
+                                        box-shadow: 0 4px 8px rgba(76, 175, 80, 0.2);
+                                        border-left: 4px solid #4CAF50;
+                                    '>
+                                        <h3 style='margin:0; color:#1b5e20;'>{"#DRUG4"}</h3>
+                                    </div>
+                                </div>
+                            """, unsafe_allow_html=True)
+
                     # 解释部分
-                    with st.expander("📝 作用机制详解", expanded=False):
+                    with st.expander("🔍 查看作用机制分析", expanded=False):
                         st.markdown(f"""
                             <div style='
                                 margin: 5px;
-                                background-color: #e3f2fd;
-                                padding: 10px;
-                                border-radius: 8px;
+                                background: linear-gradient(135deg, #f5f0ff 0%, #f3edff 100%);
+                                padding: 20px;
+                                border-radius: 10px;
+                                border-left: 4px solid #7e57c2;
                                 line-height: 1.8;
                                 font-size: 16px;
+                                box-shadow: 0 4px 8px rgba(126, 87, 194, 0.1);
                             '>
+                                <div style='
+                                    font-size: 20px;
+                                    color: #5e35b1;
+                                    margin-bottom: 12px;
+                                    font-weight: bold;
+                                    display: flex;
+                                    align-items: center;
+                                '>
+                                    <span style='font-size: 24px; margin-right: 8px;'>📝</span> 作用机制详解
+                                </div>
                                 {data['explanation']}
                             </div>
                         """, unsafe_allow_html=True)
