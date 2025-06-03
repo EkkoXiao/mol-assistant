@@ -56,6 +56,40 @@ if "selected_comb_cnt" not in st.session_state:
 if "recommendation_generated" not in st.session_state:
     st.session_state.recommendation_generated = False
 
+def get_score_color(score):
+    # 确保分数在[0,1]范围内
+    score = max(0, min(1, score))
+    
+    # 定义关键颜色节点（红色→橙色→黄色→黄绿色→绿色）
+    color_stops = [
+        (0.0,   0xF4, 0x43, 0x36),  # 红色
+        (0.25,  0xFF, 0x69, 0x34),  # 橙红色
+        (0.5,   0xFF, 0xC1, 0x07),  # 黄色
+        (0.75,  0xCD, 0xDC, 0x39),  # 黄绿色
+        (1.0,   0x4C, 0xAF, 0x50)   # 绿色
+    ]
+    
+    # 查找分数所在的颜色区间
+    for i in range(len(color_stops) - 1):
+        start_pos, r1, g1, b1 = color_stops[i]
+        end_pos, r2, g2, b2 = color_stops[i + 1]
+        
+        if start_pos <= score <= end_pos:
+            # 计算在当前区间内的比例
+            ratio = (score - start_pos) / (end_pos - start_pos)
+            
+            # 线性插值计算RGB分量
+            r = int(r1 + (r2 - r1) * ratio)
+            g = int(g1 + (g2 - g1) * ratio)
+            b = int(b1 + (b2 - b1) * ratio)
+            
+            # 返回十六进制颜色码
+            return f"#{r:02X}{g:02X}{b:02X}"
+    
+    # 默认返回红色（正常情况下不会执行到这里）
+    return "#F44336"
+
+
 # 创建左侧sidebar
 with st.sidebar:
     st.title("请选择需要的功能")
@@ -551,14 +585,6 @@ elif function == "🧬 抗癌药物组合推荐助手":
         if st.session_state.recommendation_generated:
             st.success("✅ 药物组合推荐已生成")
 
-        # 根据分数设置颜色
-        def get_score_color(score):
-            if score > 0.6:
-                return "#4CAF50"  # 绿色
-            elif score > 0.3:
-                return "#FFC107"  # 黄色
-            else:
-                return "#F44336"  # 红色
 
         if st.session_state.get("recommendation_result"):
             st.subheader("💊 推荐的药物组合")
@@ -646,7 +672,7 @@ elif function == "🧬 抗癌药物组合推荐助手":
                                         flex-direction: column;
                                     '>
                                         <span style='font-size: 32px; font-weight: bold; color:{score_color};'>{data['score']:.3f}</span>
-                                        <span style='font-size: 14px; color:#666;'>相互作用分数</span>
+                                        <span style='font-size: 14px; color:#666;'>联合抗癌分数</span>
                                     </div>
                                 </div>
                             </div>
