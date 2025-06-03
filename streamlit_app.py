@@ -609,7 +609,7 @@ elif function == "🧬 抗癌药物组合推荐助手":
                                     box-shadow: 0 4px 8px rgba(30, 136, 229, 0.2);
                                     border-left: 4px solid #1E88E5;
                                 '>
-                                    <h3 style='margin:0; color:#0d47a1;'>{data['drug1']}</h3>
+                                    <h3 style='margin:0; color:#0d47a1;'>{data['drugs'][0]}</h3>
                                 </div>
                             </div>
                         """, unsafe_allow_html=True)
@@ -674,7 +674,7 @@ elif function == "🧬 抗癌药物组合推荐助手":
                                     box-shadow: 0 4px 8px rgba(216, 27, 96, 0.2);
                                     border-right: 4px solid #D81B60;
                                 '>
-                                    <h3 style='margin:0; color:#880e4f;'>{data['drug2']}</h3>
+                                    <h3 style='margin:0; color:#880e4f;'>{data['drugs'][1]}</h3>
                                 </div>
                             </div>
                         """, unsafe_allow_html=True)
@@ -702,7 +702,7 @@ elif function == "🧬 抗癌药物组合推荐助手":
                                     box-shadow: 0 4px 8px rgba(255, 193, 7, 0.2);
                                     border-left: 4px solid #FFC107;
                                 '>
-                                    <h3 style='margin:0; color:#ff6f00;'>{"#DRUG3"}</h3>
+                                    <h3 style='margin:0; color:#ff6f00;'>{data['drugs'][2]}</h3>
                                 </div>
                             </div>
                         """, unsafe_allow_html=True)
@@ -730,7 +730,7 @@ elif function == "🧬 抗癌药物组合推荐助手":
                                         box-shadow: 0 4px 8px rgba(255, 193, 7, 0.2);
                                         border-left: 4px solid #FFC107;
                                     '>
-                                        <h3 style='margin:0; color:#ff6f00;'>{"#DRUG3"}</h3>
+                                        <h3 style='margin:0; color:#ff6f00;'>{data['drugs'][2]}</h3>
                                     </div>
                                 </div>
                             """, unsafe_allow_html=True)
@@ -755,7 +755,7 @@ elif function == "🧬 抗癌药物组合推荐助手":
                                         box-shadow: 0 4px 8px rgba(76, 175, 80, 0.2);
                                         border-left: 4px solid #4CAF50;
                                     '>
-                                        <h3 style='margin:0; color:#1b5e20;'>{"#DRUG4"}</h3>
+                                        <h3 style='margin:0; color:#1b5e20;'>{data['drugs'][3]}</h3>
                                     </div>
                                 </div>
                             """, unsafe_allow_html=True)
