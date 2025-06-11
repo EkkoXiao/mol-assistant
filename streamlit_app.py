@@ -263,7 +263,6 @@ with st.sidebar:
                 except Exception as e:
                     st.error("靶点获取失败，请稍后再试！")
 
-
 # 主页面内容
 if function == None:
     st.title("欢迎使用多功能联合用药助手")
@@ -403,16 +402,17 @@ elif function == "💊 联合用药反应评估助手":
                     prompt_cancer = f"以下为几种用于{cancer_type}治疗的药物信息：\n"
                     for drug in drug_information:
                         prompt_cancer += f"药物名称{drug['name']}，药物性质简要信息{drug['property']}，药物靶点信息{drug['target']}, 药物可能的SMILES序列{drug['smiles']}\n"
-                    prompt_cancer += "以下为他们之间相互作用不良反应及协同药效的可能的预测信息及发生可能性，该结果并非权威数据，仅供可能的参考所用。\n"
-                    for key in drug_interaction_keys[:1]:
-                        interactions = next((pair[key] for pair in st.session_state.interactions if key in pair), None)
-                        drug1 = st.session_state.drugs[key // 10]['name']
-                        drug2 = st.session_state.drugs[key % 10]['name']
+                    
+                    # prompt_cancer += "以下为他们之间相互作用不良反应及协同药效的可能的预测信息及发生可能性，该结果并非权威数据，仅供可能的参考所用。\n"
+                    # for key in drug_interaction_keys:
+                    #     interactions = next((pair[key] for pair in st.session_state.interactions if key in pair), None)
+                    #     drug1 = st.session_state.drugs[key // 10]['name']
+                    #     drug2 = st.session_state.drugs[key % 10]['name']
 
-                        interaction_text = "\n".join(
-                            [f"- \"{desc}\"  ({prob * 100:.2f}%)" for desc, (prob, _) in interactions.items()]
-                        )
-                        prompt_cancer += f"药物{drug1}与{drug2}联合用药可能有如下情况出现：{interaction_text}\n"
+                    #     interaction_text = "\n".join(
+                    #         [f"- \"{desc}\"  ({prob * 100:.2f}%)" for desc, (prob, _) in interactions.items()]
+                    #     )
+                    #     prompt_cancer += f"药物{drug1}与{drug2}联合用药可能有如下情况出现：{interaction_text}\n"
 
                     # prompt_cancer += f"关于{cancer_type}治疗中上述几种药物联合用药与单药相比在有效性和安全性方面的差异，请基于全球权威指南（如NCCN、ESMO）、高循证等级的临床试验数据（如III期随机对照试验，RCT）以及相关研究数据库，提供详细的分析与说明，可能用做参考的量化评估数据例如：总生存期（OS），无进展生存期（PFS），客观缓解率（ORR），3 级及以上不良事件发生率，治疗相关死亡率等。我们已知这几个药物组合总是有效的，解释一下作用机理或者原因，不需要详细讲述它们之间的不良反应，并最后总能得出能够推荐这几个药物的结论。"
                     prompt_cancer += f"关于{cancer_type}治疗中上述几种药物联合用药与单药相比在有效性和安全性方面的差异，我们已知他们联合使用是有效的，根据上述内容选择有用的线索，解释一下作用机理或者原因，不需要详细讲述它们之间的不良反应，并最后总能得出能够推荐这几个药物的结论。"
@@ -420,7 +420,7 @@ elif function == "💊 联合用药反应评估助手":
                     try:
                         decoder = json.JSONDecoder()
                         think = False
-                        answer = "🔄 模型连接中..."
+                        answer = "⏳ 结果生成中，请稍加等待..."
                         response_placeholder.markdown(answer)
 
                         response = requests.post(
@@ -428,7 +428,6 @@ elif function == "💊 联合用药反应评估助手":
                             json={"messages": [{"role": "user", "content": prompt_cancer}]},
                             stream=True
                         )
-                        # answer = "⏳ 结果生成中，请稍加等待..."
                         answer = ""
 
                         for chunk in response.iter_lines():
@@ -492,7 +491,7 @@ elif function == "💊 联合用药反应评估助手":
                 messages = st.session_state.messages.copy()
                 messages.append({"role": "system", "content": "如果上述问题涉及生物医药，请基于全球权威指南（如NCCN、ESMO）、高循证等级的临床试验数据（如III期随机对照试验，RCT）以及相关研究数据库，提供详细的原因分析和量化评估，提供的药物反应预测概率数据可能有误，请仔细辨别。"})
                 with st.chat_message("assistant"):
-                    answer = "模型连接中..."
+                    answer = "结果生成中，请稍加等待......"
                     response_placeholder = st.empty()
                     response_placeholder.markdown(answer)
 
@@ -501,7 +500,6 @@ elif function == "💊 联合用药反应评估助手":
                         json={"messages": messages},
                         stream=True
                     )
-                    # answer = "结果生成中，请稍加等待..."
                     answer = ""
                     
                     decoder = json.JSONDecoder()
