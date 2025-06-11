@@ -499,10 +499,11 @@ elif function == "💊 联合用药反应评估助手":
                         json={"messages": messages},
                         stream=True
                     )
-                    answer = "结果生成中，请稍加等待..."
+                    #answer = "结果生成中，请稍加等待..."
+                    answer = ""
                     
                     decoder = json.JSONDecoder()
-                    think = True
+                    think = False
 
                     st.session_state.messages.append({"role": "assistant", "content": ""})
 
