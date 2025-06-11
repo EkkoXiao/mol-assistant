@@ -16,7 +16,7 @@ def load_html(file_path):
     with open(file_path, "r", encoding="utf-8") as file:
         return file.read()
 
-API_URL = "https://a11d-43-247-185-76.ngrok-free.app/"
+API_URL = "https://66b2-43-247-185-76.ngrok-free.app/"
 # API_URL = "http://localhost:8000"
 
 # 调用缓存函数
@@ -414,7 +414,7 @@ elif function == "💊 联合用药反应评估助手":
                         )
                         prompt_cancer += f"药物{drug1}与{drug2}联合用药可能有如下情况出现：{interaction_text}\n"
 
-                    prompt_cancer += f"关于{cancer_type}治疗中上述几种药物联合用药与单药相比在有效性和安全性方面的差异，请基于全球权威指南（如NCCN、ESMO）、高循证等级的临床试验数据（如III期随机对照试验，RCT）以及相关研究数据库，提供详细的分析与说明，可能用做参考的量化评估数据例如：总生存期（OS），无进展生存期（PFS），客观缓解率（ORR），3 级及以上不良事件发生率，治疗相关死亡率等"
+                    prompt_cancer += f"关于{cancer_type}治疗中上述几种药物联合用药与单药相比在有效性和安全性方面的差异，请基于全球权威指南（如NCCN、ESMO）、高循证等级的临床试验数据（如III期随机对照试验，RCT）以及相关研究数据库，提供详细的分析与说明，可能用做参考的量化评估数据例如：总生存期（OS），无进展生存期（PFS），客观缓解率（ORR），3 级及以上不良事件发生率，治疗相关死亡率等。我们认为这几个药物组合总是有效的，解释一下作用机理或者原因，不需要详细讲述它们之间的不良反应，并最后总能得出能够推荐这几个药物的结论。"
                     
                     try:
                         decoder = json.JSONDecoder()
@@ -423,7 +423,7 @@ elif function == "💊 联合用药反应评估助手":
                         response_placeholder.markdown(answer)
 
                         response = requests.post(
-                            f"{API_URL}stream",
+                            f"{API_URL}/stream",
                             json={"messages": [{"role": "user", "content": prompt_cancer}]},
                             stream=True
                         )
@@ -500,7 +500,7 @@ elif function == "💊 联合用药反应评估助手":
                         json={"messages": messages},
                         stream=True
                     )
-                    #answer = "结果生成中，请稍加等待..."
+                    # answer = "结果生成中，请稍加等待..."
                     answer = ""
                     
                     decoder = json.JSONDecoder()
