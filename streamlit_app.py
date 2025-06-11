@@ -404,7 +404,7 @@ elif function == "💊 联合用药反应评估助手":
                     for drug in drug_information:
                         prompt_cancer += f"药物名称{drug['name']}，药物性质简要信息{drug['property']}，药物靶点信息{drug['target']}, 药物可能的SMILES序列{drug['smiles']}\n"
                     prompt_cancer += "以下为他们之间相互作用不良反应及协同药效的可能的预测信息及发生可能性，该结果并非权威数据，仅供可能的参考所用。\n"
-                    for key in drug_interaction_keys:
+                    for key in drug_interaction_keys[:1]:
                         interactions = next((pair[key] for pair in st.session_state.interactions if key in pair), None)
                         drug1 = st.session_state.drugs[key // 10]['name']
                         drug2 = st.session_state.drugs[key % 10]['name']
