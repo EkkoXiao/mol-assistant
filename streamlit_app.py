@@ -417,7 +417,7 @@ elif function == "💊 联合用药反应评估助手":
                     
                     try:
                         decoder = json.JSONDecoder()
-                        think = True
+                        think = False
                         answer = "🔄 模型连接中..."
                         response_placeholder.markdown(answer)
 
@@ -426,7 +426,8 @@ elif function == "💊 联合用药反应评估助手":
                             json={"messages": [{"role": "user", "content": prompt_cancer}]},
                             stream=True
                         )
-                        answer = "⏳ 结果生成中，请稍加等待..."
+                        # answer = "⏳ 结果生成中，请稍加等待..."
+                        answer = ""
 
                         for chunk in response.iter_lines():
                             chunk = chunk.decode("utf-8")
@@ -534,11 +535,133 @@ elif function == "💊 联合用药反应评估助手":
 
 elif function == "🧬 抗癌药物组合推荐助手":
 
-    st.title("🧬 抗癌药物组合推荐助手")
+    st.markdown("""
+    <style>
+        /* 标题样式 */
+        .custom-title {
+            font-size: 2.2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #e0e4ec;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+        }
+        
+        /* 癌症信息卡片 */
+        .cancer-card {
+            border-radius: 12px;
+            padding: 1.2rem 1.5rem;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, #f0f5ff 0%, #e6f0ff 100%);
+            border: 1px solid #4d7cfe;
+            box-shadow: 0 4px 10px rgba(77, 124, 254, 0.15);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .cancer-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 5px;
+            background: linear-gradient(to bottom, #4d7cfe, #6a8eff);
+        }
+        
+        /* 警告卡片 */
+        .warning-card {
+            border-radius: 12px;
+            padding: 1.2rem 1.5rem;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, #fff8e1 0%, #fff3e0 100%);
+            border: 1px solid #ffb300;
+            box-shadow: 0 4px 10px rgba(255, 179, 0, 0.15);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .warning-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 5px;
+            background: linear-gradient(to bottom, #ffb300, #ffca28);
+        }
+        
+        /* 卡片内容样式 */
+        .card-content {
+            padding-left: 1.5rem;
+        }
+        
+        .card-title {
+            font-weight: 600;
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .card-icon {
+            font-size: 1.5rem;
+        }
+        
+        /* 动画效果 */
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(77, 124, 254, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(77, 124, 254, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(77, 124, 254, 0); }
+        }
+        
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # 标题部分
+    st.markdown(
+        f'<div class="custom-title">'
+        f'  <span>🧬</span>'
+        f'  <span>抗癌药物组合推荐助手</span>'
+        f'</div>', 
+        unsafe_allow_html=True
+    )
+
+    # 癌症信息卡片
     if st.session_state.cancer_type != None:
-        st.info(f"当前已选择癌症：♋ {st.session_state.cancer_type}")
+        st.markdown(
+            f'<div class="cancer-card pulse-animation">'
+            f'  <div class="card-content">'
+            f'      <div class="card-title">'
+            f'          <span class="card-icon">♋</span>'
+            f'          <span>当前已选择癌症类型: {st.session_state.cancer_type}</span>'
+            f'      </div>'
+            f'  </div>'
+            f'</div>', 
+            unsafe_allow_html=True
+        )
     else:
-        st.warning("⚠️ 请选择癌症类型")
+        st.markdown(
+            f'<div class="warning-card">'
+            f'  <div class="card-content">'
+            f'      <div class="card-title">'
+            f'          <span class="card-icon">⚠️</span>'
+            f'          <span>请从左侧菜单中选择癌症类型以继续</span>'
+            f'      </div>'
+            f'  </div>'
+            f'</div>', 
+            unsafe_allow_html=True
+        )
 
     def update_selected_targets():
         st.session_state.selected_targets = st.session_state.selected_targets_current
