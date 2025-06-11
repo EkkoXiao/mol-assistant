@@ -112,7 +112,8 @@ with st.sidebar:
 
             # 提交后处理数据
             if submit_button:
-                if drug_name and drug_property and drug_target and drug_smiles:
+                # if drug_name and drug_property and drug_target and drug_smiles:
+                if drug_name and drug_property:
                     drug_idx = [idx for idx, drug in enumerate(st.session_state.drugs) if drug["name"].lower() == drug_name.lower()]
                     if drug_idx != []:
                         st.error("该药物已输入！")
