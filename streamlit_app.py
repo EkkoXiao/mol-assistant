@@ -16,7 +16,7 @@ def load_html(file_path):
     with open(file_path, "r", encoding="utf-8") as file:
         return file.read()
 
-API_URL = "https://66b2-43-247-185-76.ngrok-free.app/"
+API_URL = "https://1cebcf6da2de.ngrok-free.app"
 # API_URL = "http://localhost:8000"
 
 # 调用缓存函数
@@ -45,10 +45,10 @@ if "cancer_reply" not in st.session_state:
 # 功能 B
 if "cancer_type" not in st.session_state:
     st.session_state.cancer_type = None
-if "selected_targets" not in st.session_state:
-    st.session_state.selected_targets = []
-if "cancer_targets" not in st.session_state:
-    st.session_state.cancer_targets = []
+if "selected_cell_line" not in st.session_state:
+    st.session_state.selected_cell_line = None
+if "cancer_cell_lines" not in st.session_state:
+    st.session_state.cancer_cell_lines = []
 if "recommendation_result" not in st.session_state:
     st.session_state.recommendation_result = []
 if "selected_comb_cnt" not in st.session_state:
@@ -58,15 +58,15 @@ if "recommendation_generated" not in st.session_state:
 
 def get_score_color(score):
     # 确保分数在[0,1]范围内
-    score = max(0, min(1, score))
+    score = max(0, min(150, score))
     
     # 定义关键颜色节点（红色→橙色→黄色→黄绿色→绿色）
     color_stops = [
-        (0.0,   0xF4, 0x43, 0x36),  # 红色
-        (0.25,  0xFF, 0x69, 0x34),  # 橙红色
-        (0.5,   0xFF, 0xC1, 0x07),  # 黄色
-        (0.75,  0xCD, 0xDC, 0x39),  # 黄绿色
-        (1.0,   0x4C, 0xAF, 0x50)   # 绿色
+        (0,   0xF4, 0x43, 0x36),  # 红色
+        (37.5,  0xFF, 0x69, 0x34),  # 橙红色
+        (75,   0xFF, 0xC1, 0x07),  # 黄色
+        (112.5,  0xCD, 0xDC, 0x39),  # 黄绿色
+        (150,   0x4C, 0xAF, 0x50)   # 绿色
     ]
     
     # 查找分数所在的颜色区间
@@ -246,8 +246,8 @@ with st.sidebar:
         )
 
         if confirm_button:
-            st.session_state.cancer_targets = []
-            st.session_state.selected_targets = []
+            st.session_state.cancer_cell_lines = []
+            st.session_state.selected_cell_line = None
             st.session_state.recommendation_result = []
             if cancer_type is None:
                 st.warning("⚠️ 请选择一种癌症类型后再点击确定")
@@ -255,13 +255,13 @@ with st.sidebar:
                 st.session_state.cancer_type = cancer_type
                 st.success(f"✅ 已选择癌症类型：{cancer_type}")
                 cancer_type_en = cancer_type.replace("乳腺癌", "breast_cancer").replace("胃癌", "stomach_cancer").replace("肠癌", "colon_cancer").replace("肝癌", "liver_cancer")   
-                # TODO 调用后端，获取癌症对应靶点信息
+                # 调用后端，获取癌症对应的细胞系信息
                 try:
-                    resp = requests.get(f"{API_URL}/cancer_targets", params={"cancer_type": cancer_type_en})
+                    resp = requests.get(f"{API_URL}/cancer_cell_line", params={"cancer_type": cancer_type_en})
                     resp.raise_for_status()
-                    st.session_state.cancer_targets = resp.json()["targets"]
+                    st.session_state.cancer_cell_lines = resp.json()["cell_lines"]
                 except Exception as e:
-                    st.error("靶点获取失败，请稍后再试！")
+                    st.error("细胞系获取失败，请稍后再试！")
 
 # 主页面内容
 if function == None:
@@ -664,50 +664,76 @@ elif function == "🧬 抗癌药物组合推荐助手":
             unsafe_allow_html=True
         )
 
-    def update_selected_targets():
-        st.session_state.selected_targets = st.session_state.selected_targets_current
+    # def update_selected_cell_line():
+    #     st.session_state.selected_cell_line = st.session_state.selected_cell_line_current
 
-    if st.session_state.cancer_targets:
-        selected = st.multiselect(
-            "🎯 请选择目标靶点",
-            default=st.session_state.get("selected_targets", []),
-            options=st.session_state.cancer_targets,
-            on_change=update_selected_targets,
-            format_func=lambda x: x["name"],
-            key="selected_targets_current"
+    if st.session_state.cancer_cell_lines:
+        selected = st.selectbox(
+            "🎯 请选择细胞系",
+            index=None,
+            options=st.session_state.cancer_cell_lines,
+            key="selected_cell_line_current",
+            on_change=lambda: setattr(st.session_state, 'selected_cell_line', st.session_state.selected_cell_line_current)
         )
-      
-        # st.json(st.session_state.selected_targets)
-        # 选择推荐的药物组合数量
-        num_drugs = st.slider("💊 请选择推荐药物组合的数量", min_value=2, max_value=4, value=2)
 
-        # TODO: 根据靶点信息进行药物组合推荐
+        num_drugs = st.slider("💊 请选择药物组合中的药物数量", min_value=2, max_value=4, value=2)
+
+        max_approved = num_drugs 
+        approved_drugs = st.slider("✅ 请选择药物组合中已上市的药物数量", min_value=0, max_value=max_approved, value=0)
+
+        topk = st.slider("📊 请选择需要推荐的组合数量", min_value=1, max_value=5, value=1)
+
+        # 根据细胞系和药物组合参数进行推荐
         if st.button("🔍 生成药物组合推荐"):
             st.session_state.selected_comb_cnt = num_drugs
             st.session_state.recommendation_result = []
-            if not st.session_state.selected_targets:
-                st.warning("⚠️ 请先选择至少一个靶点")
-                st.session_state.recommendation_generated = False  # 清除状态
+            if not st.session_state.selected_cell_line:
+                st.warning("⚠️ 请先选择一个细胞系")
+                st.session_state.recommendation_generated = False
             else:
+                # 加载动画
+                loading_placeholder = st.empty()
+                
+                with loading_placeholder.container():
+                    st.markdown("""
+                    <div style="text-align: center; padding: 20px;">
+                        <div style="display: inline-block; width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                        <p style="margin-top: 15px; color: #666; font-size: 16px;">🤖 正在分析药物组合...</p>
+                    </div>
+                    <style>
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                    </style>
+                    """, unsafe_allow_html=True)
+                
                 try:
                     resp = requests.post(
                         f"{API_URL}/recommend_combo",
-                        json={"targets": st.session_state.selected_targets,
-                              "count": st.session_state.selected_comb_cnt},
+                        json={
+                            "cell_line": st.session_state.selected_cell_line,
+                            "count": num_drugs,
+                            "label": approved_drugs,
+                            "topk": topk
+                        },
                         timeout=120
                     )
                     resp.raise_for_status()
                     st.session_state.recommendation_result = resp.json()["combos"]
+                    
+                    loading_placeholder.empty()
+                    
                     if len(st.session_state.recommendation_result) > 0:
                         st.session_state.recommendation_generated = True
+                        st.success("✅ 药物组合推荐生成完成！")
                     else:
-                        st.warning("⚠️ 未找到合适的药物组合，请选择更多靶点")
+                        st.warning("⚠️ 未找到合适的药物组合，请调整参数")
                         st.session_state.recommendation_generated = False
                 except Exception as e:
+                    loading_placeholder.empty()
                     st.error("推荐生成超时，请稍后再试！")
 
-        if st.session_state.recommendation_generated:
-            st.success("✅ 药物组合推荐已生成")
 
 
         if st.session_state.get("recommendation_result"):
@@ -759,7 +785,7 @@ elif function == "🧬 抗癌药物组合推荐助手":
                                     box-shadow: 0 4px 8px rgba(30, 136, 229, 0.2);
                                     border-left: 4px solid #1E88E5;
                                 '>
-                                    <h3 style='margin:0; color:#0d47a1;'>{data['drugs'][0]}</h3>
+                                    <h3 style='margin:0; color:#0d47a1;'>{data['combo'][0]}</h3>
                                 </div>
                             </div>
                         """, unsafe_allow_html=True)
@@ -824,7 +850,7 @@ elif function == "🧬 抗癌药物组合推荐助手":
                                     box-shadow: 0 4px 8px rgba(216, 27, 96, 0.2);
                                     border-right: 4px solid #D81B60;
                                 '>
-                                    <h3 style='margin:0; color:#880e4f;'>{data['drugs'][1]}</h3>
+                                    <h3 style='margin:0; color:#880e4f;'>{data['combo'][1]}</h3>
                                 </div>
                             </div>
                         """, unsafe_allow_html=True)
@@ -852,13 +878,13 @@ elif function == "🧬 抗癌药物组合推荐助手":
                                     box-shadow: 0 4px 8px rgba(255, 193, 7, 0.2);
                                     border-left: 4px solid #FFC107;
                                 '>
-                                    <h3 style='margin:0; color:#ff6f00;'>{data['drugs'][2]}</h3>
+                                    <h3 style='margin:0; color:#ff6f00;'>{data['combo'][2]}</h3>
                                 </div>
                             </div>
                         """, unsafe_allow_html=True)
                             
                     elif st.session_state.selected_comb_cnt == 4:
-                        _, col_left, col_right, _ = st.columns([0.25, 1, 1, 0.25])
+                        _, col_left, col_right, _ = st.columns([0.1, 1, 1, 0.1])
                         with col_left:
                             st.markdown(f"""
                                 <div style='
@@ -880,7 +906,7 @@ elif function == "🧬 抗癌药物组合推荐助手":
                                         box-shadow: 0 4px 8px rgba(255, 193, 7, 0.2);
                                         border-left: 4px solid #FFC107;
                                     '>
-                                        <h3 style='margin:0; color:#ff6f00;'>{data['drugs'][2]}</h3>
+                                        <h3 style='margin:0; color:#ff6f00;'>{data['combo'][2]}</h3>
                                     </div>
                                 </div>
                             """, unsafe_allow_html=True)
@@ -903,41 +929,38 @@ elif function == "🧬 抗癌药物组合推荐助手":
                                         overflow-y:auto;
                                         flex-direction: column;
                                         box-shadow: 0 4px 8px rgba(76, 175, 80, 0.2);
-                                        border-left: 4px solid #4CAF50;
+                                        border-right: 4px solid #4CAF50;
                                     '>
-                                        <h3 style='margin:0; color:#1b5e20;'>{data['drugs'][3]}</h3>
+                                        <h3 style='margin:0; color:#1b5e20;'>{data['combo'][3]}</h3>
                                     </div>
                                 </div>
                             """, unsafe_allow_html=True)
 
-                    # 解释部分
-                    with st.expander("🔍 查看作用机制分析", expanded=False):
-                        st.markdown(f"""
-                            <div style='
-                                margin: 5px;
-                                background: linear-gradient(135deg, #f5f0ff 0%, #f3edff 100%);
-                                padding: 20px;
-                                border-radius: 10px;
-                                border-left: 4px solid #7e57c2;
-                                line-height: 1.8;
-                                font-size: 16px;
-                                box-shadow: 0 4px 8px rgba(126, 87, 194, 0.1);
-                            '>
-                                <div style='
-                                    font-size: 20px;
-                                    color: #5e35b1;
-                                    margin-bottom: 12px;
-                                    font-weight: bold;
-                                    display: flex;
-                                    align-items: center;
-                                '>
-                                    <span style='font-size: 24px; margin-right: 8px;'>📝</span> 作用机制详解
-                                </div>
-                                {data['explanation']}
-                            </div>
-                        """, unsafe_allow_html=True)
+                    # # 解释部分
+                    # with st.expander("🔍 查看作用机制分析", expanded=False):
+                    #     st.markdown(f"""
+                    #         <div style='
+                    #             margin: 5px;
+                    #             background: linear-gradient(135deg, #f5f0ff 0%, #f3edff 100%);
+                    #             padding: 20px;
+                    #             border-radius: 10px;
+                    #             border-left: 4px solid #7e57c2;
+                    #             line-height: 1.8;
+                    #             font-size: 16px;
+                    #             box-shadow: 0 4px 8px rgba(126, 87, 194, 0.1);
+                    #         '>
+                    #             <div style='
+                    #                 font-size: 20px;
+                    #                 color: #5e35b1;
+                    #                 margin-bottom: 12px;
+                    #                 font-weight: bold;
+                    #                 display: flex;
+                    #                 align-items: center;
+                    #             '>
+                    #                 <span style='font-size: 24px; margin-right: 8px;'>📝</span> 作用机制详解
+                    #             </div>
+                    #             {data['explanation']}
+                    #         </div>
+                    #     """, unsafe_allow_html=True)
 
-                    st.markdown('</div>', unsafe_allow_html=True)
-
-
-
+                    # st.markdown('</div>', unsafe_allow_html=True)
