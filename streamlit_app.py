@@ -16,7 +16,7 @@ def load_html(file_path):
     with open(file_path, "r", encoding="utf-8") as file:
         return file.read()
 
-API_URL = "https://1cebcf6da2de.ngrok-free.app"
+API_URL = "https://4020f1c8d6e1.ngrok-free.app"
 # API_URL = "http://localhost:8000"
 
 # 调用缓存函数
@@ -57,7 +57,6 @@ if "recommendation_generated" not in st.session_state:
     st.session_state.recommendation_generated = False
 
 def get_score_color(score):
-    # 确保分数在[0,1]范围内
     score = max(0, min(150, score))
     
     # 定义关键颜色节点（红色→橙色→黄色→黄绿色→绿色）
@@ -681,7 +680,7 @@ elif function == "🧬 抗癌药物组合推荐助手":
         max_approved = num_drugs 
         approved_drugs = st.slider("✅ 请选择药物组合中已上市的药物数量", min_value=0, max_value=max_approved, value=0)
 
-        topk = st.slider("📊 请选择需要推荐的组合数量", min_value=1, max_value=5, value=1)
+        topk = st.number_input("📊 请输入需要推荐的组合数量", min_value=1, max_value=100, value=1, step=1)
 
         # 根据细胞系和药物组合参数进行推荐
         if st.button("🔍 生成药物组合推荐"):
