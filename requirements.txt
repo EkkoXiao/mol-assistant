@@ -2,3 +2,5 @@ streamlit
 streamlit-extras
 requests
 pandas
+networkx
+plotly

@@ -1,23 +1,14 @@
 import itertools
 import json
-import random
-import re
-import time
 import pandas as pd
 import requests
 import streamlit as st
 from streamlit_extras.stylable_container import stylable_container
+from utils import API_URL, load_html, get_score_color, get_network_data, display_network_graph
 
 # 设置页面标题和样式
 st.set_page_config(page_title="联合用药助手", page_icon="💊", layout="wide")
 
-@st.cache_resource
-def load_html(file_path):
-    with open(file_path, "r", encoding="utf-8") as file:
-        return file.read()
-
-API_URL = "https://4020f1c8d6e1.ngrok-free.app"
-# API_URL = "http://localhost:8000"
 
 # 调用缓存函数
 html_content = load_html("page.html")
@@ -55,39 +46,10 @@ if "selected_comb_cnt" not in st.session_state:
     st.session_state.selected_comb_cnt = 2
 if "recommendation_generated" not in st.session_state:
     st.session_state.recommendation_generated = False
-
-def get_score_color(score):
-    score = max(0, min(150, score))
-    
-    # 定义关键颜色节点（红色→橙色→黄色→黄绿色→绿色）
-    color_stops = [
-        (0,   0xF4, 0x43, 0x36),  # 红色
-        (37.5,  0xFF, 0x69, 0x34),  # 橙红色
-        (75,   0xFF, 0xC1, 0x07),  # 黄色
-        (112.5,  0xCD, 0xDC, 0x39),  # 黄绿色
-        (150,   0x4C, 0xAF, 0x50)   # 绿色
-    ]
-    
-    # 查找分数所在的颜色区间
-    for i in range(len(color_stops) - 1):
-        start_pos, r1, g1, b1 = color_stops[i]
-        end_pos, r2, g2, b2 = color_stops[i + 1]
-        
-        if start_pos <= score <= end_pos:
-            # 计算在当前区间内的比例
-            ratio = (score - start_pos) / (end_pos - start_pos)
-            
-            # 线性插值计算RGB分量
-            r = int(r1 + (r2 - r1) * ratio)
-            g = int(g1 + (g2 - g1) * ratio)
-            b = int(b1 + (b2 - b1) * ratio)
-            
-            # 返回十六进制颜色码
-            return f"#{r:02X}{g:02X}{b:02X}"
-    
-    # 默认返回红色（正常情况下不会执行到这里）
-    return "#F44336"
-
+if "current_view" not in st.session_state:
+    st.session_state.current_view = "recommendation"  # "recommendation" or "network"
+if "network_data" not in st.session_state:
+    st.session_state.network_data = None
 
 # 创建左侧sidebar
 with st.sidebar:
@@ -236,7 +198,7 @@ with st.sidebar:
                 ["乳腺癌", "胃癌", "肠癌", "肝癌"].index(st.session_state.cancer_type)
                 if st.session_state.cancer_type in ["乳腺癌", "胃癌", "肠癌", "肝癌"]
                 else None
-            ),
+            )
         )
 
         confirm_button = st.button(
@@ -663,9 +625,6 @@ elif function == "🧬 抗癌药物组合推荐助手":
             unsafe_allow_html=True
         )
 
-    # def update_selected_cell_line():
-    #     st.session_state.selected_cell_line = st.session_state.selected_cell_line_current
-
     if st.session_state.cancer_cell_lines:
         selected = st.selectbox(
             "🎯 请选择细胞系",
@@ -720,12 +679,11 @@ elif function == "🧬 抗癌药物组合推荐助手":
                     )
                     resp.raise_for_status()
                     st.session_state.recommendation_result = resp.json()["combos"]
-                    
+                
                     loading_placeholder.empty()
                     
                     if len(st.session_state.recommendation_result) > 0:
                         st.session_state.recommendation_generated = True
-                        st.success("✅ 药物组合推荐生成完成！")
                     else:
                         st.warning("⚠️ 未找到合适的药物组合，请调整参数")
                         st.session_state.recommendation_generated = False
@@ -733,38 +691,58 @@ elif function == "🧬 抗癌药物组合推荐助手":
                     loading_placeholder.empty()
                     st.error("推荐生成超时，请稍后再试！")
 
-
-
         if st.session_state.get("recommendation_result"):
-            st.subheader("💊 推荐的药物组合")
+            st.markdown("""
+            <div style="display: flex; align-items: center; width: 100%; margin: 20px 0;">
+            """, unsafe_allow_html=True)
+            
+            view_option = st.radio(
+                "选择视图模式",
+                ["💊 推荐列表", "🔗 网络图"],
+                index=0,
+                horizontal=True,
+                label_visibility="collapsed",
+                key="view_selector"
+            )
+            
+            st.markdown("</div>", unsafe_allow_html=True)
+            
+            # 根据选择更新视图状态
+            if view_option == "💊 推荐列表":
+                st.session_state.current_view = "recommendation"
+            else:
+                st.session_state.current_view = "network"
+                st.session_state.network_data = None
+                st.session_state.selected_combo_index = 0
+            
+            if st.session_state.current_view == "recommendation":
+                for idx, data in enumerate(st.session_state.recommendation_result):
+                    with stylable_container(
+                        key=f"drug_card_{idx}",
+                        css_styles="""
+                            {
+                                position: relative;
+                                border: 1px solid rgba(49, 51, 63, 0.2);
+                                border-radius: 12px;
+                                padding: 5px;
+                                box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+                                background-color: white;
+                                margin-bottom: 5px;
+                                overflow: hidden;
+                            }
+                            .drug-content {
+                                position: relative;
+                                z-index: 1;
+                            }
+                        """,
+                    ):
+                        st.markdown('<div class="drug-content">', unsafe_allow_html=True)
 
-            for idx, data in enumerate(st.session_state.recommendation_result):
-                with stylable_container(
-                    key=f"drug_card_{idx}",
-                    css_styles="""
-                        {
-                            position: relative;
-                            border: 1px solid rgba(49, 51, 63, 0.2);
-                            border-radius: 12px;
-                            padding: 5px;
-                            box-shadow: 0 6px 16px rgba(0,0,0,0.1);
-                            background-color: white;
-                            margin-bottom: 5px;
-                            overflow: hidden;
-                        }
-                        .drug-content {
-                            position: relative;
-                            z-index: 1;
-                        }
-                    """,
-                ):
-                    st.markdown('<div class="drug-content">', unsafe_allow_html=True)
+                        col1, col2, col3 = st.columns([1, 0.5, 1])
 
-                    col1, col2, col3 = st.columns([1, 0.5, 1])
-
-                    # 药物1
-                    with col1:
-                        st.markdown(f"""
+                        # 药物1
+                        with col1:
+                            st.markdown(f"""
                             <div style='
                                 height: 160px;
                                 display: flex;
@@ -789,103 +767,75 @@ elif function == "🧬 抗癌药物组合推荐助手":
                             </div>
                         """, unsafe_allow_html=True)
 
-                    # 分数展示
-                    with col2:
-                        score_color = get_score_color(data['score'])
-                        st.markdown(f"""
-                            <div style='
-                                min-height: 160px;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                            '>
+                        # 分数展示
+                        with col2:
+                            score_color = get_score_color(data['score'])
+                            st.markdown(f"""
                                 <div style='
-                                    width: 140px;
-                                    height: 140px;
-                                    border-radius: 50%;
-                                    background: conic-gradient({score_color} 0% {data['score']*100}%, #e0e0e0 {data['score']*100}% 100%);
+                                    min-height: 160px;
                                     display: flex;
                                     align-items: center;
                                     justify-content: center;
-                                    box-shadow: 0 6px 12px rgba(0,0,0,0.1);
-                                    border: 6px solid white;
                                 '>
                                     <div style='
-                                        width: 120px;
-                                        height: 120px;
+                                        width: 140px;
+                                        height: 140px;
                                         border-radius: 50%;
-                                        background: white;
+                                        background: conic-gradient({score_color} 0% {data['score']*100}%, #e0e0e0 {data['score']*100}% 100%);
                                         display: flex;
                                         align-items: center;
                                         justify-content: center;
-                                        flex-direction: column;
+                                        box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+                                        border: 6px solid white;
                                     '>
-                                        <span style='font-size: 32px; font-weight: bold; color:{score_color};'>{data['score']:.3f}</span>
-                                        <span style='font-size: 14px; color:#666;'>联合抗癌分数</span>
+                                        <div style='
+                                            width: 120px;
+                                            height: 120px;
+                                            border-radius: 50%;
+                                            background: white;
+                                            display: flex;
+                                            align-items: center;
+                                            justify-content: center;
+                                            flex-direction: column;
+                                        '>
+                                            <span style='font-size: 32px; font-weight: bold; color:{score_color};'>{data['score']:.3f}</span>
+                                            <span style='font-size: 14px; color:#666;'>联合抗癌分数</span>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        """, unsafe_allow_html=True)
+                            """, unsafe_allow_html=True)
 
-                    # 药物2
-                    with col3:
-                        st.markdown(f"""
-                            <div style='
-                                height: 160px;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                            '>
+                        # 药物2
+                        with col3:
+                            st.markdown(f"""
                                 <div style='
-                                    background: linear-gradient(145deg, #f8bbd0, #fce4ec);
-                                    padding: 25px;
-                                    border-radius: 10px;
-                                    text-align: center;
-                                    height: 70%;
-                                    width: 80%;
-                                    flex-grow:0.5;
-                                    overflow-y:auto;
-                                    flex-direction: column;
-                                    box-shadow: 0 4px 8px rgba(216, 27, 96, 0.2);
-                                    border-right: 4px solid #D81B60;
+                                    height: 160px;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
                                 '>
-                                    <h3 style='margin:0; color:#880e4f;'>{data['combo'][1]}</h3>
+                                    <div style='
+                                        background: linear-gradient(145deg, #f8bbd0, #fce4ec);
+                                        padding: 25px;
+                                        border-radius: 10px;
+                                        text-align: center;
+                                        height: 70%;
+                                        width: 80%;
+                                        flex-grow:0.5;
+                                        overflow-y:auto;
+                                        flex-direction: column;
+                                        box-shadow: 0 4px 8px rgba(216, 27, 96, 0.2);
+                                        border-right: 4px solid #D81B60;
+                                    '>
+                                        <h3 style='margin:0; color:#880e4f;'>{data['combo'][1]}</h3>
+                                    </div>
                                 </div>
-                            </div>
-                        """, unsafe_allow_html=True)
+                            """, unsafe_allow_html=True)
 
-                    if st.session_state.selected_comb_cnt == 3:
-                        _, col_mid, _ = st.columns([0.75, 1, 0.75])
-                        with col_mid:
-                            st.markdown(f"""
-                            <div style='
-                                height: 160px;
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                            '>
-                                <div style='
-                                    background: linear-gradient(145deg, #fff9c4, #fffde7);
-                                    padding: 25px;
-                                    border-radius: 10px;
-                                    text-align: center;
-                                    height: 70%;
-                                    width: 80%;
-                                    flex-grow:0.5;
-                                    overflow-y:auto;
-                                    flex-direction: column;
-                                    box-shadow: 0 4px 8px rgba(255, 193, 7, 0.2);
-                                    border-left: 4px solid #FFC107;
-                                '>
-                                    <h3 style='margin:0; color:#ff6f00;'>{data['combo'][2]}</h3>
-                                </div>
-                            </div>
-                        """, unsafe_allow_html=True)
-                            
-                    elif st.session_state.selected_comb_cnt == 4:
-                        _, col_left, col_right, _ = st.columns([0.1, 1, 1, 0.1])
-                        with col_left:
-                            st.markdown(f"""
+                        if st.session_state.selected_comb_cnt == 3:
+                            _, col_mid, _ = st.columns([0.75, 1, 0.75])
+                            with col_mid:
+                                st.markdown(f"""
                                 <div style='
                                     height: 160px;
                                     display: flex;
@@ -909,57 +859,97 @@ elif function == "🧬 抗癌药物组合推荐助手":
                                     </div>
                                 </div>
                             """, unsafe_allow_html=True)
-                        with col_right:
-                            st.markdown(f"""
-                                <div style='
-                                    height: 160px;
-                                    display: flex;
-                                    align-items: center;
-                                    justify-content: center;
-                                '>
+                                
+                        elif st.session_state.selected_comb_cnt == 4:
+                            _, col_left, col_right, _ = st.columns([0.1, 1, 1, 0.1])
+                            with col_left:
+                                st.markdown(f"""
                                     <div style='
-                                        background: linear-gradient(145deg, #c8e6c9, #e8f5e9);
-                                        padding: 25px;
-                                        border-radius: 10px;
-                                        text-align: center;
-                                        height: 70%;
-                                        width: 80%;
-                                        flex-grow:0.5;
-                                        overflow-y:auto;
-                                        flex-direction: column;
-                                        box-shadow: 0 4px 8px rgba(76, 175, 80, 0.2);
-                                        border-right: 4px solid #4CAF50;
+                                        height: 160px;
+                                        display: flex;
+                                        align-items: center;
+                                        justify-content: center;
                                     '>
-                                        <h3 style='margin:0; color:#1b5e20;'>{data['combo'][3]}</h3>
+                                        <div style='
+                                            background: linear-gradient(145deg, #fff9c4, #fffde7);
+                                            padding: 25px;
+                                            border-radius: 10px;
+                                            text-align: center;
+                                            height: 70%;
+                                            width: 80%;
+                                            flex-grow:0.5;
+                                            overflow-y:auto;
+                                            flex-direction: column;
+                                            box-shadow: 0 4px 8px rgba(255, 193, 7, 0.2);
+                                            border-left: 4px solid #FFC107;
+                                        '>
+                                            <h3 style='margin:0; color:#ff6f00;'>{data['combo'][2]}</h3>
+                                        </div>
                                     </div>
-                                </div>
-                            """, unsafe_allow_html=True)
+                                """, unsafe_allow_html=True)
+                            with col_right:
+                                st.markdown(f"""
+                                    <div style='
+                                        height: 160px;
+                                        display: flex;
+                                        align-items: center;
+                                        justify-content: center;
+                                    '>
+                                        <div style='
+                                            background: linear-gradient(145deg, #c8e6c9, #e8f5e9);
+                                            padding: 25px;
+                                            border-radius: 10px;
+                                            text-align: center;
+                                            height: 70%;
+                                            width: 80%;
+                                            flex-grow:0.5;
+                                            overflow-y:auto;
+                                            flex-direction: column;
+                                            box-shadow: 0 4px 8px rgba(76, 175, 80, 0.2);
+                                            border-right: 4px solid #4CAF50;
+                                        '>
+                                            <h3 style='margin:0; color:#1b5e20;'>{data['combo'][3]}</h3>
+                                        </div>
+                                    </div>
+                                """, unsafe_allow_html=True)
 
-                    # # 解释部分
-                    # with st.expander("🔍 查看作用机制分析", expanded=False):
-                    #     st.markdown(f"""
-                    #         <div style='
-                    #             margin: 5px;
-                    #             background: linear-gradient(135deg, #f5f0ff 0%, #f3edff 100%);
-                    #             padding: 20px;
-                    #             border-radius: 10px;
-                    #             border-left: 4px solid #7e57c2;
-                    #             line-height: 1.8;
-                    #             font-size: 16px;
-                    #             box-shadow: 0 4px 8px rgba(126, 87, 194, 0.1);
-                    #         '>
-                    #             <div style='
-                    #                 font-size: 20px;
-                    #                 color: #5e35b1;
-                    #                 margin-bottom: 12px;
-                    #                 font-weight: bold;
-                    #                 display: flex;
-                    #                 align-items: center;
-                    #             '>
-                    #                 <span style='font-size: 24px; margin-right: 8px;'>📝</span> 作用机制详解
-                    #             </div>
-                    #             {data['explanation']}
-                    #         </div>
-                    #     """, unsafe_allow_html=True)
+            elif st.session_state.current_view == "network":
+                if 'selected_combo_index' not in st.session_state:
+                    st.session_state.selected_combo_index = 0
+                
+                combo_options = []
+                for idx, result in enumerate(st.session_state.recommendation_result):
+                    combo_name = f"组合 {idx + 1}: {result['combo']}"
+                    combo_options.append(combo_name)
+                
+                st.markdown("""
+                <div style="display: flex; justify-content: center; align-items: center; width: 100%; margin: 20px 0;">
+                """, unsafe_allow_html=True)
+                
+                selected_combo_name = st.selectbox(
+                    "选择药物组合",
+                    combo_options,
+                    index=st.session_state.selected_combo_index,
+                    key="combo_selector",
+                    label_visibility="collapsed"
+                )
+                
+                st.markdown("</div>", unsafe_allow_html=True)
+                
+                selected_index = combo_options.index(selected_combo_name)
+                selected_combo = st.session_state.recommendation_result[selected_index]['combo']
+                
+                # 检查是否需要重新生成网络图
+                if st.session_state.network_data is None or st.session_state.selected_combo_index != selected_index:
+                    st.session_state.selected_combo_index = selected_index
+                    
+                    with st.spinner(f"🔄 正在生成组合 {selected_index + 1} 的网络图..."):
+                        network_data = get_network_data(st.session_state.selected_cell_line, selected_combo)
+                        if network_data:
+                            st.session_state.network_data = network_data
+                        else:
+                            st.error("无法获取网络图数据")
+                            st.stop()
+                
+                display_network_graph(st.session_state.network_data)
 
-                    # st.markdown('</div>', unsafe_allow_html=True)
